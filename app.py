@@ -37,14 +37,9 @@ def header():
         if st.session_state.get("view","home")!="home":
             if st.button("← Back", key="back_btn", use_container_width=True):
                 st.session_state["view"]="home"
-    
-    # Add deployment timestamp in top-right corner
-    st.markdown(f"""
-    <div style="position: fixed; top: 10px; right: 10px; background: rgba(68, 54, 245, 0.1); 
-                padding: 4px 8px; border-radius: 4px; font-size: 10px; color: #666; z-index: 999;">
-        Last deployed: {DEPLOYMENT_TIME}
-    </div>
-    """, unsafe_allow_html=True)
+        
+        # Add timestamp in the same column as the back button
+        st.caption(f"🔄 Deployed: {DEPLOYMENT_TIME}")
     
     st.markdown('<hr class="div"/>', unsafe_allow_html=True)
 
