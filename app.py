@@ -275,6 +275,104 @@ def filter_internal_test_emails(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Data
         removed["Reason"] = "Internal/test email domain"
     return work[mask].copy(), removed
 
+# Add these new functions to your app.py
+
+# HubSpot Cars API endpoints
+HS_CARS_SEARCH_URL = f"{HS_ROOT}/crm/v3/objects/cars/search"
+
+def hs_deals_to_cars_map(deal_ids: list[str]) -> dict[str, list[str]]:
+    """Get car IDs associated with each deal."""
+    out = {str(d): [] for d in deal_ids}
+    if not deal_ids: return out
+    
+    url = f"{HS_ROOT}/crm/v4/objects/deals/batch/read"
+    payload = {"properties": [], "inputs": [{"id": str(d)} for d in deal_ids], "associations": ["cars"]}
+    try:
+        r = requests.post(url, headers=hs_headers(), json=payload, timeout=25)
+        r.raise_for_status()
+        for item in r.json().get("results", []):
+            did = str(item.get("id"))
+            cars = [a.get("id") for a in item.get("associations", {}).get("cars", [])]
+            out[did] = [str(x) for x in cars if x]
+    except Exception as e:
+        st.warning(f"Could not read deal→cars associations: {e}")
+    return out
+
+def hs_cars_to_deals_map(car_ids: list[str]) -> dict[str, list[str]]:
+    """Get deal IDs associated with each car."""
+    out = {str(c): [] for c in car_ids}
+    if not car_ids: return out
+    
+    url = f"{HS_ROOT}/crm/v4/objects/cars/batch/read"
+    payload = {"properties": [], "inputs": [{"id": str(c)} for c in car_ids], "associations": ["deals"]}
+    try:
+        r = requests.post(url, headers=hs_headers(), json=payload, timeout=25)
+        r.raise_for_status()
+        for item in r.json().get("results", []):
+            cid = str(item.get("id"))
+            deals = [a.get("id") for a in item.get("associations", {}).get("deals", [])]
+            out[cid] = [str(x) for x in deals if x]
+    except Exception as e:
+        st.warning(f"Could not read car→deals associations: {e}")
+    return out
+
+def filter_deals_by_car_active_purchases(deals_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Filter out deals where the associated car has other deals with active purchase stages.
+    Returns (kept_deals, dropped_deals_with_reason).
+    """
+    if deals_df is None or deals_df.empty:
+        return deals_df.copy() if isinstance(deals_df, pd.DataFrame) else pd.DataFrame(), pd.DataFrame()
+    
+    # Get deal IDs
+    deal_ids = deals_df.get("hs_object_id", pd.Series(dtype=str)).dropna().astype(str).tolist()
+    if not deal_ids:
+        return deals_df.copy(), pd.DataFrame()
+    
+    # Get deal → car associations
+    d2c = hs_deals_to_cars_map(deal_ids)
+    
+    # Get all unique car IDs
+    car_ids = sorted({cid for cids in d2c.values() for cid in cids})
+    if not car_ids:
+        return deals_df.copy(), pd.DataFrame()
+    
+    # Get car → deals associations
+    c2d = hs_cars_to_deals_map(car_ids)
+    
+    # Get all other deal IDs (not in our original set)
+    other_deal_ids = sorted({did for _, dlist in c2d.items() for did in dlist if did not in deal_ids})
+    
+    # Get stages for other deals
+    stage_map = hs_batch_read_deals(other_deal_ids, props=["dealstage"])
+    
+    # Find cars that have active purchase deals
+    cars_with_active_purchases = set()
+    for cid, dlist in c2d.items():
+        for did in dlist:
+            if did in deal_ids:  # Skip our original deals
+                continue
+            stage = (stage_map.get(did, {}) or {}).get("dealstage")
+            if stage and str(stage) in ACTIVE_PURCHASE_STAGE_IDS:
+                cars_with_active_purchases.add(cid)
+                break
+    
+    # Filter deals
+    def keep_deal(row):
+        d_id = str(row.get("hs_object_id") or "")
+        cids = d2c.get(d_id, [])
+        return not any((c in cars_with_active_purchases) for c in cids)
+    
+    work = deals_df.copy()
+    work["__keep"] = work.apply(keep_deal, axis=1)
+    
+    dropped = work[~work["__keep"]].drop(columns=["__keep"]).copy()
+    kept = work[work["__keep"]].drop(columns=["__keep"]).copy()
+    
+    if not dropped.empty:
+        dropped["Reason"] = "Car has another deal in active purchase stage"
+    
+    return kept, dropped
 
 def show_removed_table(df: pd.DataFrame, title: str):
     """Small helper to render removed items table (if any)."""
@@ -811,17 +909,21 @@ def view_reminders():
         )
         deals = prepare_deals(raw)
 
-        # 1) Filter internal/test emails (re-enabled) + show callout
-        deals_f, removed_internal = filter_internal_test_emails(deals)
+        # 1) NEW: Filter by car active purchases (before other filters)
+        deals_car_filtered, dropped_car_purchases = filter_deals_by_car_active_purchases(deals)
 
-        # 2) Audit dedupe (returns dedup + dropped list with reasons)
+        # 2) Filter internal/test emails + show callout
+        deals_f, removed_internal = filter_internal_test_emails(deals_car_filtered)
+
+        # 3) Audit dedupe (returns dedup + dropped list with reasons)
         dedup, dedupe_dropped = dedupe_users_with_audit(deals_f, use_conducted=False)
 
-        # 3) Build messages with audit (messages + skipped list with reasons)
+        # 4) Build messages with audit (messages + skipped list with reasons)
         msgs, skipped_msgs = build_messages_with_audit(dedup, mode="reminder")
 
         # persist all artifacts so checkboxes don't reset the page
         st.session_state["reminders_deals"] = deals_f
+        st.session_state["reminders_dropped_car_purchases"] = dropped_car_purchases
         st.session_state["reminders_removed_internal"] = removed_internal
         st.session_state["reminders_dedup"] = dedup
         st.session_state["reminders_dedupe_dropped"] = dedupe_dropped
@@ -830,11 +932,16 @@ def view_reminders():
 
     # ---- Render from persisted state ----
     deals_f      = st.session_state.get("reminders_deals")
+    dropped_car  = st.session_state.get("reminders_dropped_car_purchases")
     removed_int  = st.session_state.get("reminders_removed_internal")
     dedup        = st.session_state.get("reminders_dedup")
     dedupe_drop  = st.session_state.get("reminders_dedupe_dropped")
     msgs         = st.session_state.get("reminders_msgs")
     skipped_msgs = st.session_state.get("reminders_skipped_msgs")
+
+    # Show car purchase filter results FIRST
+    if isinstance(dropped_car, pd.DataFrame) and not dropped_car.empty:
+        show_removed_table(dropped_car, "Removed (car has active purchase deal)")
 
     if isinstance(removed_int, pd.DataFrame) and not removed_int.empty:
         show_removed_table(removed_int, "Removed by domain filter (cars24.com / yopmail.com)")
