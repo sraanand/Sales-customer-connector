@@ -840,19 +840,47 @@ def render_selectable_messages(messages_df: pd.DataFrame, key: str) -> pd.DataFr
     if messages_df is None or messages_df.empty:
         st.info("No messages to preview."); return pd.DataFrame()
 
-    # 🔧 Force wrap inside Data Editor cells (works for all workflows using this helper)
+    # Enhanced CSS for better text wrapping
     st.markdown("""
     <style>
-    /* Wrap long text in st.data_editor cells (Message Preview) */
+    /* Force text wrapping in all data editor cells */
     [data-testid="stDataEditor"] div[role="gridcell"] {
         white-space: pre-wrap !important;
+        word-wrap: break-word !important;
         word-break: break-word !important;
         overflow-wrap: anywhere !important;
-        line-height: 1.35 !important;
+        line-height: 1.4 !important;
+        max-width: none !important;
+        height: auto !important;
+        min-height: 60px !important;
     }
-    /* Allow rows to expand with content */
+    
+    /* Specific targeting for SMS draft column */
+    [data-testid="stDataEditor"] div[role="gridcell"]:nth-child(4) {
+        white-space: pre-wrap !important;
+        word-wrap: break-word !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+        min-height: 80px !important;
+        padding: 8px !important;
+    }
+    
+    /* Allow rows to expand */
     [data-testid="stDataEditor"] div[role="row"] {
         align-items: stretch !important;
+        height: auto !important;
+        min-height: 60px !important;
+    }
+    
+    /* Grid container adjustments */
+    [data-testid="stDataEditor"] div[role="grid"] {
+        overflow: visible !important;
+    }
+    
+    /* Column header adjustments */
+    [data-testid="stDataEditor"] div[role="columnheader"] {
+        height: auto !important;
+        min-height: 40px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -867,11 +895,12 @@ def render_selectable_messages(messages_df: pd.DataFrame, key: str) -> pd.DataFr
         view_df,
         key=f"editor_{key}",
         use_container_width=True,
+        height=400,  # Give more height for the editor
         column_config={
             "Send": st.column_config.CheckboxColumn("Send", help="Tick to send this SMS", default=False, width="small"),
-            "Customer": st.column_config.TextColumn("Customer", width=180),
-            "Phone": st.column_config.TextColumn("Phone", width=180),
-            "SMS draft": st.column_config.TextColumn("SMS draft", width=1000),  # wide + wrapped
+            "Customer": st.column_config.TextColumn("Customer", width=150),
+            "Phone": st.column_config.TextColumn("Phone", width=130),
+            "SMS draft": st.column_config.TextColumn("SMS draft", width=500, help="Click to edit message"),
         },
         hide_index=True,
     )
@@ -948,7 +977,7 @@ def view_reminders():
 
     if isinstance(deals_f, pd.DataFrame) and not deals_f.empty:
         render_trimmed(deals_f, "Filtered deals (trimmed)", [
-            ("full_name","Customer"), ("email","Email"),
+            ("full_name","Customer"), ("email","Email"), ("phone_norm","Phone"),
             ("vehicle_make","Make"), ("vehicle_model","Model"),
             ("slot_date_prop","TD booking date"), ("slot_time_param","Time"),
             ("Stage","Stage"),
