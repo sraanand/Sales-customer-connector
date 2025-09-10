@@ -831,7 +831,7 @@ def header():
 def ctas():
     c1,c2,c3 = st.columns(3)
     with c1:
-        if st.button("🛣️  Test Drive Reminders\n\n• Friendly reminders  • TD date + state", key="cta1"):
+        if st.button("🛣️  Test Drive Reminders", key="cta1"):
             st.session_state["view"]="reminders"
     with c2:
         if st.button("👔  Manager Follow-Ups\n\n• After TD conducted  • Single date or range", key="cta2"):
