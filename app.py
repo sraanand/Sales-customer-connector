@@ -19,11 +19,11 @@ from dotenv import load_dotenv
 
 # ============ Keys / Setup ============
 load_dotenv()
-HUBSPOT_TOKEN     = os.getenv("HUBSPOT_TOKEN", "")
-AIRCALL_ID        = os.getenv("AIRCALL_ID")
-AIRCALL_TOKEN     = os.getenv("AIRCALL_TOKEN")
-AIRCALL_NUMBER_ID = os.getenv("AIRCALL_NUMBER_ID")
-OPENAI_API_KEY    = os.getenv("OPENAI_API_KEY")
+HUBSPOT_TOKEN     = os.getenv("HUBSPOT_TOKEN") or st.secrets.get("HUBSPOT_TOKEN", "")
+AIRCALL_ID        = os.getenv("AIRCALL_ID") or st.secrets.get("AIRCALL_ID", "")
+AIRCALL_TOKEN     = os.getenv("AIRCALL_TOKEN") or st.secrets.get("AIRCALL_TOKEN", "")
+AIRCALL_NUMBER_ID = os.getenv("AIRCALL_NUMBER_ID") or st.secrets.get("AIRCALL_NUMBER_ID", "")
+OPENAI_API_KEY    = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", "")
 
 # OpenAI client (support both new & legacy SDKs)
 _openai_ok = False
