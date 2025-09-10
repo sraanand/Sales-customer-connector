@@ -1,10 +1,6 @@
 # app.py
 # Pawan Customer Connector — HubSpot + Aircall (Streamlit)
-# Fixes:
-#  - Message checkboxes default UNCHECKED
-#  - Persist data/results in session_state so editing checkboxes doesn't reset the workflow
-#  - Keep using td_booking_slot_time for "Time" in reminders
-#  - Dedup table shows exact date/time; preview shows relative, as before
+# Updated with working appointment_id-based car filtering
 
 import os
 import time
@@ -17,39 +13,16 @@ import requests
 import streamlit as st
 from dotenv import load_dotenv
 
-# Get deployment timestamp - this will be set when the app starts
-DEPLOYMENT_TIME = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
-
-# Then update your header() function:
-def header():
-    cols = st.columns([1, 6, 1.2])
-    with cols[0]:
-        logo_path = next((p for p in ["H2.svg", "cars24_logo.svg", "logo.svg", "cars24.png"] if os.path.exists(p)), None)
-        if logo_path: st.image(logo_path, width=100, use_container_width=False)
-        else:
-            st.markdown(
-                f"<div style='height:40px;display:flex;align-items:center;'><div style='background:{PRIMARY};padding:6px 10px;border-radius:6px;'><span style='font-weight:800;color:#FFFFFF'>CARS24</span></div></div>",
-                unsafe_allow_html=True
-            )
-    with cols[1]:
-        st.markdown('<h1 class="header-title" style="margin:0;">Pawan Customer Connector</h1>', unsafe_allow_html=True)
-    with cols[2]:
-        if st.session_state.get("view","home")!="home":
-            if st.button("← Back", key="back_btn", use_container_width=True):
-                st.session_state["view"]="home"
-        
-        # Add timestamp in the same column as the back button
-        st.caption(f"🔄 Deployed: {DEPLOYMENT_TIME}")
-    
-    st.markdown('<hr class="div"/>', unsafe_allow_html=True)
-
 # ============ Keys / Setup ============
 load_dotenv()
-HUBSPOT_TOKEN     = os.getenv("HUBSPOT_TOKEN") or st.secrets.get("HUBSPOT_TOKEN", "")
-AIRCALL_ID        = os.getenv("AIRCALL_ID") or st.secrets.get("AIRCALL_ID", "")
-AIRCALL_TOKEN     = os.getenv("AIRCALL_TOKEN") or st.secrets.get("AIRCALL_TOKEN", "")
-AIRCALL_NUMBER_ID = os.getenv("AIRCALL_NUMBER_ID") or st.secrets.get("AIRCALL_NUMBER_ID", "")
-OPENAI_API_KEY    = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", "")
+HUBSPOT_TOKEN     = os.getenv("HUBSPOT_TOKEN", "")
+AIRCALL_ID        = os.getenv("AIRCALL_ID")
+AIRCALL_TOKEN     = os.getenv("AIRCALL_TOKEN")
+AIRCALL_NUMBER_ID = os.getenv("AIRCALL_NUMBER_ID")
+OPENAI_API_KEY    = os.getenv("OPENAI_API_KEY")
+
+# Deployment timestamp
+DEPLOYMENT_TIME = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
 
 # OpenAI client (support both new & legacy SDKs)
 _openai_ok = False
@@ -79,7 +52,7 @@ HS_TOTAL_CAP  = 1000
 # Aircall
 AIRCALL_BASE_URL = "https://api.aircall.io/v1"
 
-# Pipeline & stages (from you)
+# Pipeline & stages
 PIPELINE_ID        = "2345821"
 STAGE_ENQUIRY_ID   = "1119198251"  # Enquiry (no TD)
 STAGE_BOOKED_ID    = "1119198252"  # 2. TD Booked
@@ -87,7 +60,7 @@ STAGE_CONDUCTED_ID = "1119198253"  # 3. TD Conducted (no deposit)
 
 OLD_LEAD_START_STAGES = {STAGE_ENQUIRY_ID, STAGE_BOOKED_ID, STAGE_CONDUCTED_ID}
 
-# Active purchase stages (exclude old-lead follow-ups if any contact has these on another deal)
+# Active purchase stages (exclude if any deal with same appointment_id has these stages)
 ACTIVE_PURCHASE_STAGE_IDS = {
     "8082239", "8082240", "8082241", "8082242", "8082243", "8406593",
     "14816089", "14804235", "14804236", "14804237", "14804238",
@@ -153,6 +126,42 @@ label, .stSelectbox label, .stDateInput label, .stTextInput label {{ color: #000
 [data-testid="stDataFrame"] * {{ color:#000000 !important; }}
 [data-testid="stDataFrame"] div[data-testid="stVerticalBlock"] {{ background:#FFFFFF !important; }}
 [data-testid="stTable"] td, [data-testid="stTable"] th {{ color:#000000 !important; }}
+
+/* Enhanced text wrapping for data editor */
+[data-testid="stDataEditor"] div[role="gridcell"] {{
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.4 !important;
+  max-width: none !important;
+  height: auto !important;
+  min-height: 60px !important;
+}}
+
+[data-testid="stDataEditor"] div[role="gridcell"]:nth-child(4) {{
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  min-height: 80px !important;
+  padding: 8px !important;
+}}
+
+[data-testid="stDataEditor"] div[role="row"] {{
+  align-items: stretch !important;
+  height: auto !important;
+  min-height: 60px !important;
+}}
+
+[data-testid="stDataEditor"] div[role="grid"] {{
+  overflow: visible !important;
+}}
+
+[data-testid="stDataEditor"] div[role="columnheader"] {{
+  height: auto !important;
+  min-height: 40px !important;
+}}
 
 /* Preview table legacy (kept if we render) */
 .preview-table table {{
@@ -278,9 +287,9 @@ def prepare_deals(df: pd.DataFrame | None) -> pd.DataFrame:
     for c in DEAL_PROPS:
         if c not in df.columns: df[c] = pd.Series(dtype="object")
     df["slot_date"]      = df["td_booking_slot"].apply(parse_epoch_or_iso_to_local_date)
-    df["slot_time"]      = df["td_booking_slot"].apply(parse_epoch_or_iso_to_local_time)           # legacy time
+    df["slot_time"]      = df["td_booking_slot"].apply(parse_epoch_or_iso_to_local_time)
     df["slot_date_prop"] = df["td_booking_slot_date"].apply(parse_epoch_or_iso_to_local_date)
-    df["slot_time_param"]= df["td_booking_slot_time"].apply(parse_td_slot_time_prop)               # preferred time
+    df["slot_time_param"]= df["td_booking_slot_time"].apply(parse_td_slot_time_prop)
     df["conducted_date_local"] = df["td_conducted_date"].apply(parse_epoch_or_iso_to_local_date)
     df["conducted_time_local"] = df["td_conducted_date"].apply(parse_epoch_or_iso_to_local_time)
     df["phone_raw"]      = df["mobile"].where(df["mobile"].notna(), df["phone"])
@@ -301,129 +310,6 @@ def filter_internal_test_emails(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Data
         removed["Reason"] = "Internal/test email domain"
     return work[mask].copy(), removed
 
-# Add these new functions to your app.py
-
-# HubSpot Cars API endpoints
-HS_CARS_SEARCH_URL = f"{HS_ROOT}/crm/v3/objects/cars/search"
-
-def hs_deals_to_cars_map(deal_ids: list[str]) -> dict[str, list[str]]:
-    """Get car IDs associated with each deal."""
-    out = {str(d): [] for d in deal_ids}
-    if not deal_ids: return out
-    
-    url = f"{HS_ROOT}/crm/v4/objects/deals/batch/read"
-    payload = {"properties": [], "inputs": [{"id": str(d)} for d in deal_ids], "associations": ["cars"]}
-    try:
-        r = requests.post(url, headers=hs_headers(), json=payload, timeout=25)
-        r.raise_for_status()
-        for item in r.json().get("results", []):
-            did = str(item.get("id"))
-            cars = [a.get("id") for a in item.get("associations", {}).get("cars", [])]
-            out[did] = [str(x) for x in cars if x]
-    except Exception as e:
-        st.warning(f"Could not read deal→cars associations: {e}")
-    return out
-
-def hs_cars_to_deals_map(car_ids: list[str]) -> dict[str, list[str]]:
-    """Get deal IDs associated with each car."""
-    out = {str(c): [] for c in car_ids}
-    if not car_ids: return out
-    
-    url = f"{HS_ROOT}/crm/v4/objects/cars/batch/read"
-    payload = {"properties": [], "inputs": [{"id": str(c)} for c in car_ids], "associations": ["deals"]}
-    try:
-        r = requests.post(url, headers=hs_headers(), json=payload, timeout=25)
-        r.raise_for_status()
-        for item in r.json().get("results", []):
-            cid = str(item.get("id"))
-            deals = [a.get("id") for a in item.get("associations", {}).get("deals", [])]
-            out[cid] = [str(x) for x in deals if x]
-    except Exception as e:
-        st.warning(f"Could not read car→deals associations: {e}")
-    return out
-
-def filter_deals_by_car_active_purchases(deals_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Filter out deals where the associated car has other deals with active purchase stages.
-    Returns (kept_deals, dropped_deals_with_reason).
-    """
-    if deals_df is None or deals_df.empty:
-        return deals_df.copy() if isinstance(deals_df, pd.DataFrame) else pd.DataFrame(), pd.DataFrame()
-    
-    st.write(f"🔍 DEBUG: Starting car filter with {len(deals_df)} deals")
-    
-    # Get deal IDs
-    deal_ids = deals_df.get("hs_object_id", pd.Series(dtype=str)).dropna().astype(str).tolist()
-    if not deal_ids:
-        st.write("🔍 DEBUG: No deal IDs found")
-        return deals_df.copy(), pd.DataFrame()
-    
-    st.write(f"🔍 DEBUG: Processing deal IDs: {deal_ids}")
-    
-    # Get deal → car associations
-    d2c = hs_deals_to_cars_map(deal_ids)
-    st.write(f"🔍 DEBUG: Deal→Car mapping: {d2c}")
-    
-    # Get all unique car IDs
-    car_ids = sorted({cid for cids in d2c.values() for cid in cids})
-    if not car_ids:
-        st.write("🔍 DEBUG: No car IDs found in associations")
-        return deals_df.copy(), pd.DataFrame()
-    
-    st.write(f"🔍 DEBUG: Found car IDs: {car_ids}")
-    
-    # Get car → deals associations
-    c2d = hs_cars_to_deals_map(car_ids)
-    st.write(f"🔍 DEBUG: Car→Deal mapping: {c2d}")
-    
-    # Get all other deal IDs (not in our original set)
-    other_deal_ids = sorted({did for _, dlist in c2d.items() for did in dlist if did not in deal_ids})
-    st.write(f"🔍 DEBUG: Other deal IDs to check: {other_deal_ids}")
-    
-    if not other_deal_ids:
-        st.write("🔍 DEBUG: No other deals found to check")
-        return deals_df.copy(), pd.DataFrame()
-    
-    # Get stages for other deals
-    stage_map = hs_batch_read_deals(other_deal_ids, props=["dealstage"])
-    st.write(f"🔍 DEBUG: Stage mapping for other deals: {stage_map}")
-    
-    # Find cars that have active purchase deals
-    cars_with_active_purchases = set()
-    for cid, dlist in c2d.items():
-        for did in dlist:
-            if did in deal_ids:  # Skip our original deals
-                continue
-            stage = (stage_map.get(did, {}) or {}).get("dealstage")
-            st.write(f"🔍 DEBUG: Deal {did} has stage {stage}")
-            if stage and str(stage) in ACTIVE_PURCHASE_STAGE_IDS:
-                cars_with_active_purchases.add(cid)
-                st.write(f"🔍 DEBUG: Car {cid} has active purchase (deal {did} with stage {stage})")
-    
-    st.write(f"🔍 DEBUG: Cars with active purchases: {cars_with_active_purchases}")
-    
-    # Filter deals
-    def keep_deal(row):
-        d_id = str(row.get("hs_object_id") or "")
-        cids = d2c.get(d_id, [])
-        should_keep = not any((c in cars_with_active_purchases) for c in cids)
-        st.write(f"🔍 DEBUG: Deal {d_id} with cars {cids} -> keep: {should_keep}")
-        return should_keep
-    
-    work = deals_df.copy()
-    work["__keep"] = work.apply(keep_deal, axis=1)
-    
-    dropped = work[~work["__keep"]].drop(columns=["__keep"]).copy()
-    kept = work[work["__keep"]].drop(columns=["__keep"]).copy()
-    
-    if not dropped.empty:
-        dropped["Reason"] = "Car has another deal in active purchase stage"
-    
-    st.write(f"🔍 DEBUG: Final result - Kept: {len(kept)}, Dropped: {len(dropped)}")
-    
-    return kept, dropped
-
-
 def show_removed_table(df: pd.DataFrame, title: str):
     """Small helper to render removed items table (if any)."""
     if df is None or df.empty:
@@ -438,7 +324,6 @@ def show_removed_table(df: pd.DataFrame, title: str):
                      "dealstage":"Stage"
                  }),
                  use_container_width=True)
-
 
 def dedupe_users_with_audit(df: pd.DataFrame, *, use_conducted: bool) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -456,7 +341,6 @@ def dedupe_users_with_audit(df: pd.DataFrame, *, use_conducted: bool) -> tuple[p
     for _, grp in work.groupby("user_key", sort=False):
         if len(grp) <= 1:
             continue
-        # We consider the first row as the representative; the rest are 'collapsed' by dedupe
         representative = grp.iloc[0]
         rep_name  = str(representative.get("full_name") or "").strip()
         rep_phone = str(representative.get("phone_norm") or "").strip()
@@ -475,14 +359,12 @@ def dedupe_users_with_audit(df: pd.DataFrame, *, use_conducted: bool) -> tuple[p
     dropped_df = pd.DataFrame(dropped_rows)
     return base, dropped_df
 
-
 def build_messages_with_audit(dedup_df: pd.DataFrame, mode: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Build messages; also return a 'skipped' DF with reasons (e.g., missing phone, empty draft).
     """
     msgs_df = build_messages_from_dedup(dedup_df, mode=mode)
     skipped = []
-    # Re-run minimal checks so we can collect reasons for any that were dropped
     if dedup_df is not None and not dedup_df.empty:
         for _, row in dedup_df.iterrows():
             phone = str(row.get("Phone") or "").strip()
@@ -494,7 +376,6 @@ def build_messages_with_audit(dedup_df: pd.DataFrame, mode: str) -> tuple[pd.Dat
                     "Reason": "Missing/invalid phone"
                 })
             else:
-                # Find the corresponding message row; if none, we skipped it
                 if msgs_df.empty or not (msgs_df["Phone"] == phone).any():
                     skipped.append({
                         "Customer": str(row.get("CustomerName") or ""),
@@ -505,10 +386,120 @@ def build_messages_with_audit(dedup_df: pd.DataFrame, mode: str) -> tuple[pd.Dat
     skipped_df = pd.DataFrame(skipped, columns=["Customer","Email","Cars","Reason"])
     return msgs_df, skipped_df
 
+# ============ NEW: Appointment ID based car filtering ============
+def get_deals_by_appointment_id(appointment_id: str) -> list[str]:
+    """Get all deal IDs that have the given appointment_id"""
+    if not appointment_id:
+        return []
+    
+    try:
+        url = f"{HS_ROOT}/crm/v3/objects/deals/search"
+        payload = {
+            "filterGroups": [
+                {
+                    "filters": [
+                        {
+                            "propertyName": "appointment_id",
+                            "operator": "EQ",
+                            "value": str(appointment_id).strip()
+                        }
+                    ]
+                }
+            ],
+            "properties": ["hs_object_id", "dealstage", "appointment_id"],
+            "limit": 100
+        }
+        response = requests.post(url, headers=hs_headers(), json=payload, timeout=25)
+        
+        if response.status_code == 200:
+            data = response.json()
+            deals = data.get("results", [])
+            return [deal["properties"]["hs_object_id"] for deal in deals]
+        else:
+            st.warning(f"Error searching deals by appointment_id: {response.text}")
+            return []
+            
+    except Exception as e:
+        st.warning(f"Exception searching deals by appointment_id: {e}")
+        return []
+
+def filter_deals_by_appointment_id_car_active_purchases(deals_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Filter out deals where other deals with the same appointment_id have active purchase stages.
+    This works by:
+    1. Getting the appointment_id for each deal
+    2. Finding all other deals with the same appointment_id  
+    3. Checking if any of those other deals have active purchase stages
+    4. Excluding the original deal if so
+    """
+    if deals_df is None or deals_df.empty:
+        return deals_df.copy() if isinstance(deals_df, pd.DataFrame) else pd.DataFrame(), pd.DataFrame()
+    
+    # Get deal IDs
+    deal_ids = deals_df.get("hs_object_id", pd.Series(dtype=str)).dropna().astype(str).tolist()
+    if not deal_ids:
+        return deals_df.copy(), pd.DataFrame()
+    
+    # Get appointment_id for each deal
+    deal_appointment_map = {}
+    deal_data = hs_batch_read_deals(deal_ids, props=["appointment_id"])
+    
+    for deal_id in deal_ids:
+        props = deal_data.get(deal_id, {})
+        appointment_id = props.get("appointment_id")
+        if appointment_id:
+            deal_appointment_map[deal_id] = str(appointment_id).strip()
+    
+    if not deal_appointment_map:
+        return deals_df.copy(), pd.DataFrame()
+    
+    # For each unique appointment_id, find all deals with that appointment_id
+    appointment_ids = set(deal_appointment_map.values())
+    
+    # Get all deals for each appointment_id and check their stages
+    deals_to_exclude = set()
+    
+    for appointment_id in appointment_ids:
+        # Get all deals with this appointment_id
+        all_deals_for_appointment = get_deals_by_appointment_id(appointment_id)
+        
+        # Get stages for all these deals
+        if all_deals_for_appointment:
+            stage_data = hs_batch_read_deals(all_deals_for_appointment, props=["dealstage"])
+            
+            # Check if any deal (other than our original ones) has active purchase stage
+            has_active_purchase = False
+            for check_deal_id in all_deals_for_appointment:
+                if check_deal_id in deal_ids:
+                    continue  # Skip our original deals
+                
+                stage = (stage_data.get(check_deal_id, {}) or {}).get("dealstage")
+                
+                if stage and str(stage) in ACTIVE_PURCHASE_STAGE_IDS:
+                    has_active_purchase = True
+                    break
+            
+            # If any other deal has active purchase stage, exclude all our original deals with this appointment_id
+            if has_active_purchase:
+                for deal_id, deal_appointment in deal_appointment_map.items():
+                    if deal_appointment == appointment_id:
+                        deals_to_exclude.add(deal_id)
+    
+    # Filter the dataframe
+    work = deals_df.copy()
+    work["__keep"] = work["hs_object_id"].apply(lambda x: str(x) not in deals_to_exclude)
+    
+    dropped = work[~work["__keep"]].drop(columns=["__keep"]).copy()
+    kept = work[work["__keep"]].drop(columns=["__keep"]).copy()
+    
+    if not dropped.empty:
+        dropped["Reason"] = "Car (via appointment_id) has another deal in active purchase stage"
+    
+    return kept, dropped
+
 # ============ HubSpot ============
 @st.cache_data(show_spinner=False)
 def hs_get_deal_property_options(property_name: str) -> list[dict]:
-    # Fallback to keep app usable if network flakes
     fallback_states = [{"label": s, "value": s} for s in ["VIC","NSW","QLD","SA","WA","TAS","NT","ACT"]]
     try:
         url = f"{HS_PROP_URL}/{property_name}"
@@ -845,12 +836,13 @@ def header():
         if st.session_state.get("view","home")!="home":
             if st.button("← Back", key="back_btn", use_container_width=True):
                 st.session_state["view"]="home"
+        st.caption(f"🔄 Deployed: {DEPLOYMENT_TIME}")
     st.markdown('<hr class="div"/>', unsafe_allow_html=True)
 
 def ctas():
     c1,c2,c3 = st.columns(3)
     with c1:
-        if st.button("🛣️  Test Drive Reminders", key="cta1"):
+        if st.button("🛣️  Test Drive Reminders\n\n• Friendly reminders  • TD date + state", key="cta1"):
             st.session_state["view"]="reminders"
     with c2:
         if st.button("👔  Manager Follow-Ups\n\n• After TD conducted  • Single date or range", key="cta2"):
@@ -890,51 +882,6 @@ def render_selectable_messages(messages_df: pd.DataFrame, key: str) -> pd.DataFr
     if messages_df is None or messages_df.empty:
         st.info("No messages to preview."); return pd.DataFrame()
 
-    # Enhanced CSS for better text wrapping
-    st.markdown("""
-    <style>
-    /* Force text wrapping in all data editor cells */
-    [data-testid="stDataEditor"] div[role="gridcell"] {
-        white-space: pre-wrap !important;
-        word-wrap: break-word !important;
-        word-break: break-word !important;
-        overflow-wrap: anywhere !important;
-        line-height: 1.4 !important;
-        max-width: none !important;
-        height: auto !important;
-        min-height: 60px !important;
-    }
-    
-    /* Specific targeting for SMS draft column */
-    [data-testid="stDataEditor"] div[role="gridcell"]:nth-child(4) {
-        white-space: pre-wrap !important;
-        word-wrap: break-word !important;
-        overflow: visible !important;
-        text-overflow: unset !important;
-        min-height: 80px !important;
-        padding: 8px !important;
-    }
-    
-    /* Allow rows to expand */
-    [data-testid="stDataEditor"] div[role="row"] {
-        align-items: stretch !important;
-        height: auto !important;
-        min-height: 60px !important;
-    }
-    
-    /* Grid container adjustments */
-    [data-testid="stDataEditor"] div[role="grid"] {
-        overflow: visible !important;
-    }
-    
-    /* Column header adjustments */
-    [data-testid="stDataEditor"] div[role="columnheader"] {
-        height: auto !important;
-        min-height: 40px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
     view_df = messages_df[["CustomerName","Phone","Message"]].rename(
         columns={"CustomerName":"Customer","Message":"SMS draft"}
     ).copy()
@@ -945,7 +892,7 @@ def render_selectable_messages(messages_df: pd.DataFrame, key: str) -> pd.DataFr
         view_df,
         key=f"editor_{key}",
         use_container_width=True,
-        height=400,  # Give more height for the editor
+        height=400,
         column_config={
             "Send": st.column_config.CheckboxColumn("Send", help="Tick to send this SMS", default=False, width="small"),
             "Customer": st.column_config.TextColumn("Customer", width=150),
@@ -955,7 +902,6 @@ def render_selectable_messages(messages_df: pd.DataFrame, key: str) -> pd.DataFr
         hide_index=True,
     )
     return edited
-
 
 # ============ Views (persist data in session_state) ============
 def view_reminders():
@@ -988,8 +934,8 @@ def view_reminders():
         )
         deals = prepare_deals(raw)
 
-        # 1) NEW: Filter by car active purchases (before other filters) - WITH DEBUGGING
-        deals_car_filtered, dropped_car_purchases = filter_deals_by_car_active_purchases(deals)
+        # 1) Filter by appointment_id car active purchases (NEW APPROACH)
+        deals_car_filtered, dropped_car_purchases = filter_deals_by_appointment_id_car_active_purchases(deals)
 
         # 2) Filter internal/test emails + show callout
         deals_f, removed_internal = filter_internal_test_emails(deals_car_filtered)
@@ -1020,14 +966,14 @@ def view_reminders():
 
     # Show car purchase filter results FIRST
     if isinstance(dropped_car, pd.DataFrame) and not dropped_car.empty:
-        show_removed_table(dropped_car, "Removed (car has active purchase deal)")
+        show_removed_table(dropped_car, "Removed (car has active purchase deal via appointment_id)")
 
     if isinstance(removed_int, pd.DataFrame) and not removed_int.empty:
         show_removed_table(removed_int, "Removed by domain filter (cars24.com / yopmail.com)")
 
     if isinstance(deals_f, pd.DataFrame) and not deals_f.empty:
         render_trimmed(deals_f, "Filtered deals (trimmed)", [
-            ("hs_object_id","Deal ID"), ("full_name","Customer"), ("email","Email"), ("phone_norm","Phone"),
+            ("hs_object_id","Deal ID"), ("appointment_id","Appointment ID"), ("full_name","Customer"), ("email","Email"), ("phone_norm","Phone"),
             ("vehicle_make","Make"), ("vehicle_model","Model"),
             ("slot_date_prop","TD booking date"), ("slot_time_param","Time"),
             ("Stage","Stage"),
@@ -1164,7 +1110,7 @@ def view_manager():
 
     if isinstance(deals_f, pd.DataFrame) and not deals_f.empty:
         render_trimmed(deals_f, "Filtered deals (trimmed)", [
-            ("full_name","Customer"), ("email","Email"),
+            ("hs_object_id","Deal ID"), ("appointment_id","Appointment ID"), ("full_name","Customer"), ("email","Email"), ("phone_norm","Phone"),
             ("vehicle_make","Make"), ("vehicle_model","Model"),
             ("conducted_date_local","TD conducted (date)"), ("conducted_time_local","Time"),
             ("Stage","Stage"),
@@ -1291,8 +1237,7 @@ def view_old():
 
     if isinstance(deals_f, pd.DataFrame) and not deals_f.empty:
         render_trimmed(deals_f, "Filtered deals (Old Leads — trimmed)", [
-            ("full_name","Customer"), ("email","Email"),
-            ("appointment_id","Appointment ID"),
+            ("hs_object_id","Deal ID"), ("appointment_id","Appointment ID"), ("full_name","Customer"), ("email","Email"), ("phone_norm","Phone"),
             ("vehicle_make","Make"), ("vehicle_model","Model"),
             ("slot_date_prop","TD booking date"),
             ("conducted_date_local","TD conducted (date)"),
@@ -1331,7 +1276,6 @@ def view_old():
                     time.sleep(1)
                 if sent: st.balloons()
                 st.success(f"🎉 Done! Sent: {sent} | Failed: {failed}")
-
 
 # ============ Router ============
 if "view" not in st.session_state:
