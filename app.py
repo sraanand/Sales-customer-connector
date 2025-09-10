@@ -350,27 +350,43 @@ def filter_deals_by_car_active_purchases(deals_df: pd.DataFrame) -> tuple[pd.Dat
     if deals_df is None or deals_df.empty:
         return deals_df.copy() if isinstance(deals_df, pd.DataFrame) else pd.DataFrame(), pd.DataFrame()
     
+    st.write(f"🔍 DEBUG: Starting car filter with {len(deals_df)} deals")
+    
     # Get deal IDs
     deal_ids = deals_df.get("hs_object_id", pd.Series(dtype=str)).dropna().astype(str).tolist()
     if not deal_ids:
+        st.write("🔍 DEBUG: No deal IDs found")
         return deals_df.copy(), pd.DataFrame()
+    
+    st.write(f"🔍 DEBUG: Processing deal IDs: {deal_ids}")
     
     # Get deal → car associations
     d2c = hs_deals_to_cars_map(deal_ids)
+    st.write(f"🔍 DEBUG: Deal→Car mapping: {d2c}")
     
     # Get all unique car IDs
     car_ids = sorted({cid for cids in d2c.values() for cid in cids})
     if not car_ids:
+        st.write("🔍 DEBUG: No car IDs found in associations")
         return deals_df.copy(), pd.DataFrame()
+    
+    st.write(f"🔍 DEBUG: Found car IDs: {car_ids}")
     
     # Get car → deals associations
     c2d = hs_cars_to_deals_map(car_ids)
+    st.write(f"🔍 DEBUG: Car→Deal mapping: {c2d}")
     
     # Get all other deal IDs (not in our original set)
     other_deal_ids = sorted({did for _, dlist in c2d.items() for did in dlist if did not in deal_ids})
+    st.write(f"🔍 DEBUG: Other deal IDs to check: {other_deal_ids}")
+    
+    if not other_deal_ids:
+        st.write("🔍 DEBUG: No other deals found to check")
+        return deals_df.copy(), pd.DataFrame()
     
     # Get stages for other deals
     stage_map = hs_batch_read_deals(other_deal_ids, props=["dealstage"])
+    st.write(f"🔍 DEBUG: Stage mapping for other deals: {stage_map}")
     
     # Find cars that have active purchase deals
     cars_with_active_purchases = set()
@@ -379,15 +395,20 @@ def filter_deals_by_car_active_purchases(deals_df: pd.DataFrame) -> tuple[pd.Dat
             if did in deal_ids:  # Skip our original deals
                 continue
             stage = (stage_map.get(did, {}) or {}).get("dealstage")
+            st.write(f"🔍 DEBUG: Deal {did} has stage {stage}")
             if stage and str(stage) in ACTIVE_PURCHASE_STAGE_IDS:
                 cars_with_active_purchases.add(cid)
-                break
+                st.write(f"🔍 DEBUG: Car {cid} has active purchase (deal {did} with stage {stage})")
+    
+    st.write(f"🔍 DEBUG: Cars with active purchases: {cars_with_active_purchases}")
     
     # Filter deals
     def keep_deal(row):
         d_id = str(row.get("hs_object_id") or "")
         cids = d2c.get(d_id, [])
-        return not any((c in cars_with_active_purchases) for c in cids)
+        should_keep = not any((c in cars_with_active_purchases) for c in cids)
+        st.write(f"🔍 DEBUG: Deal {d_id} with cars {cids} -> keep: {should_keep}")
+        return should_keep
     
     work = deals_df.copy()
     work["__keep"] = work.apply(keep_deal, axis=1)
@@ -398,7 +419,10 @@ def filter_deals_by_car_active_purchases(deals_df: pd.DataFrame) -> tuple[pd.Dat
     if not dropped.empty:
         dropped["Reason"] = "Car has another deal in active purchase stage"
     
+    st.write(f"🔍 DEBUG: Final result - Kept: {len(kept)}, Dropped: {len(dropped)}")
+    
     return kept, dropped
+
 
 def show_removed_table(df: pd.DataFrame, title: str):
     """Small helper to render removed items table (if any)."""
@@ -935,7 +959,7 @@ def render_selectable_messages(messages_df: pd.DataFrame, key: str) -> pd.DataFr
 
 # ============ Views (persist data in session_state) ============
 def view_reminders():
-    st.subheader("🛣️  Test Drive Reminders (Trial)")
+    st.subheader("🛣️  Test Drive Reminders")
     with st.form("reminders_form"):
         st.markdown('<div class="form-row">', unsafe_allow_html=True)
         c1,c2,c3 = st.columns([2,2,1])
@@ -964,7 +988,7 @@ def view_reminders():
         )
         deals = prepare_deals(raw)
 
-        # 1) NEW: Filter by car active purchases (before other filters)
+        # 1) NEW: Filter by car active purchases (before other filters) - WITH DEBUGGING
         deals_car_filtered, dropped_car_purchases = filter_deals_by_car_active_purchases(deals)
 
         # 2) Filter internal/test emails + show callout
@@ -1003,7 +1027,7 @@ def view_reminders():
 
     if isinstance(deals_f, pd.DataFrame) and not deals_f.empty:
         render_trimmed(deals_f, "Filtered deals (trimmed)", [
-            ("full_name","Customer"), ("email","Email"), ("phone_norm","Phone"),
+            ("hs_object_id","Deal ID"), ("full_name","Customer"), ("email","Email"), ("phone_norm","Phone"),
             ("vehicle_make","Make"), ("vehicle_model","Model"),
             ("slot_date_prop","TD booking date"), ("slot_time_param","Time"),
             ("Stage","Stage"),
