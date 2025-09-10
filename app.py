@@ -940,7 +940,7 @@ def render_selectable_messages(messages_df: pd.DataFrame, key: str) -> pd.DataFr
 
 # ============ Views (persist data in session_state) ============
 def view_reminders():
-    st.subheader("🛣️  Test Drive Reminders")
+    st.subheader("🛣️  Test Drive Reminders (Trial)")
     with st.form("reminders_form"):
         st.markdown('<div class="form-row">', unsafe_allow_html=True)
         c1,c2,c3 = st.columns([2,2,1])
