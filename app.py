@@ -17,6 +17,37 @@ import requests
 import streamlit as st
 from dotenv import load_dotenv
 
+# Get deployment timestamp - this will be set when the app starts
+DEPLOYMENT_TIME = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+
+# Then update your header() function:
+def header():
+    cols = st.columns([1, 6, 1.2])
+    with cols[0]:
+        logo_path = next((p for p in ["H2.svg", "cars24_logo.svg", "logo.svg", "cars24.png"] if os.path.exists(p)), None)
+        if logo_path: st.image(logo_path, width=100, use_container_width=False)
+        else:
+            st.markdown(
+                f"<div style='height:40px;display:flex;align-items:center;'><div style='background:{PRIMARY};padding:6px 10px;border-radius:6px;'><span style='font-weight:800;color:#FFFFFF'>CARS24</span></div></div>",
+                unsafe_allow_html=True
+            )
+    with cols[1]:
+        st.markdown('<h1 class="header-title" style="margin:0;">Pawan Customer Connector</h1>', unsafe_allow_html=True)
+    with cols[2]:
+        if st.session_state.get("view","home")!="home":
+            if st.button("← Back", key="back_btn", use_container_width=True):
+                st.session_state["view"]="home"
+    
+    # Add deployment timestamp in top-right corner
+    st.markdown(f"""
+    <div style="position: fixed; top: 10px; right: 10px; background: rgba(68, 54, 245, 0.1); 
+                padding: 4px 8px; border-radius: 4px; font-size: 10px; color: #666; z-index: 999;">
+        Last deployed: {DEPLOYMENT_TIME}
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('<hr class="div"/>', unsafe_allow_html=True)
+
 # ============ Keys / Setup ============
 load_dotenv()
 HUBSPOT_TOKEN     = os.getenv("HUBSPOT_TOKEN") or st.secrets.get("HUBSPOT_TOKEN", "")
@@ -1300,4 +1331,3 @@ def header_and_route():
         view_old()
 
 header_and_route()
-
