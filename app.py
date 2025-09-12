@@ -1319,11 +1319,15 @@ def view_unsold_summary():
                             "next_steps": "Review manually"
                         }
                     
+                    # Format notes for display with line breaks
+                    display_notes = notes[:300] + "..." if len(notes) > 300 else notes
+                    display_notes = display_notes.replace('\n\n', '\n').replace('\n', ' | ')
+                    
                     results.append({
                         "Deal ID": deal_id,
                         "Customer": customer_name,
                         "Vehicle": vehicle,
-                        "Notes": notes[:200] + "..." if len(notes) > 200 else notes,
+                        "Notes": display_notes,
                         "Summary": analysis.get("summary", "No summary"),
                         "Category": analysis.get("category", "Unknown"),
                         "Next Steps": analysis.get("next_steps", "No steps")
@@ -1348,21 +1352,40 @@ def view_unsold_summary():
         # Create DataFrame
         results_df = pd.DataFrame(results)
         
-        # Simple table display
+        # Display with specific column widths and configurations
         st.dataframe(
             results_df, 
             use_container_width=True, 
             hide_index=True,
+            height=600,  # Set explicit height
             column_config={
-                "Deal ID": st.column_config.TextColumn("Deal ID", width="small"),
-                "Customer": st.column_config.TextColumn("Customer", width="medium"),
-                "Vehicle": st.column_config.TextColumn("Vehicle", width="medium"), 
-                "Notes": st.column_config.TextColumn("Notes", width="large"),
-                "Summary": st.column_config.TextColumn("Summary", width="large"),
-                "Category": st.column_config.TextColumn("Category", width="medium"),
-                "Next Steps": st.column_config.TextColumn("Next Steps", width="large")
+                "Deal ID": st.column_config.TextColumn("Deal ID", width=120),
+                "Customer": st.column_config.TextColumn("Customer", width=180),
+                "Vehicle": st.column_config.TextColumn("Vehicle", width=150), 
+                "Notes": st.column_config.TextColumn("Notes", width=350),
+                "Summary": st.column_config.TextColumn("Summary", width=250),
+                "Category": st.column_config.TextColumn("Category", width=150),
+                "Next Steps": st.column_config.TextColumn("Next Steps", width=200)
             }
         )
+        
+        # Alternative: Display as expandable sections for better readability
+        st.markdown("---")
+        st.markdown("#### Detailed View (Expandable)")
+        
+        for i, result in enumerate(results):
+            with st.expander(f"{result['Customer']} - {result['Vehicle']} - {result['Category']}"):
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    st.write(f"**Deal ID:** {result['Deal ID']}")
+                    st.write(f"**Customer:** {result['Customer']}")
+                    st.write(f"**Vehicle:** {result['Vehicle']}")
+                    st.write(f"**Category:** {result['Category']}")
+                with col2:
+                    st.write(f"**Summary:** {result['Summary']}")
+                    st.write(f"**Next Steps:** {result['Next Steps']}")
+                st.write(f"**Full Notes:**")
+                st.text_area("", value=result['Notes'].replace(' | ', '\n'), height=150, key=f"notes_{i}", disabled=True)
         
         # Category breakdown
         if len(results) > 1:
@@ -1431,7 +1454,25 @@ def render_trimmed(df: pd.DataFrame, title: str, cols_map: list[tuple[str,str]])
         elif col == "Stage" and "Stage" in disp.columns:
             selected.append("Stage")
             rename["Stage"] = label or "Stage"
-    st.dataframe(disp[selected].rename(columns=rename), use_container_width=True)
+    
+    # Configure column widths based on content type
+    column_config = {}
+    for col in selected:
+        if col in ["hs_object_id", "appointment_id"]:
+            column_config[rename.get(col, col)] = st.column_config.TextColumn(rename.get(col, col), width=120)
+        elif col in ["full_name", "email"]:
+            column_config[rename.get(col, col)] = st.column_config.TextColumn(rename.get(col, col), width=200)
+        elif col in ["vehicle_make", "vehicle_model"]:
+            column_config[rename.get(col, col)] = st.column_config.TextColumn(rename.get(col, col), width=150)
+        else:
+            column_config[rename.get(col, col)] = st.column_config.TextColumn(rename.get(col, col), width=120)
+    
+    st.dataframe(
+        disp[selected].rename(columns=rename), 
+        use_container_width=True,
+        column_config=column_config,
+        height=400
+    )
 
 def render_selectable_messages(messages_df: pd.DataFrame, key: str) -> pd.DataFrame:
     """Shows a data_editor with a checkbox per row; returns the edited DF.
