@@ -431,6 +431,7 @@ def create_fallback_analysis(raw_response, customer_name):
     }
 def get_contact_ids_for_deal(deal_id):
     """Get contact IDs associated with a deal"""
+    headers = {"Authorization": f"Bearer {HUBSPOT_TOKEN}"}  
     try:
         url = f"{HS_ROOT}/crm/v3/objects/deals/{deal_id}/associations/contacts"
         response = requests.get(url, headers=headers, timeout=25)
@@ -446,6 +447,7 @@ def get_contact_ids_for_deal(deal_id):
 
 def get_contact_note_ids(contact_id):
     """Get note IDs for a contact"""
+    headers = {"Authorization": f"Bearer {HUBSPOT_TOKEN}"}
     try:
         url = f"{HS_ROOT}/crm/v3/objects/contacts/{contact_id}/associations/notes"
         response = requests.get(url, headers=headers, timeout=25)
@@ -462,6 +464,7 @@ def get_contact_note_ids(contact_id):
 
 def get_notes_content(note_ids):
     """Get note content"""
+    headers = {"Authorization": f"Bearer {HUBSPOT_TOKEN}"}
     if not note_ids:
         return []
     
@@ -484,6 +487,7 @@ def get_notes_content(note_ids):
 
 def get_owner_name(owner_id):
     """Get owner name"""
+    headers = {"Authorization": f"Bearer {HUBSPOT_TOKEN}"}
     if not owner_id:
         return "Unknown User"
     
@@ -506,6 +510,7 @@ def get_owner_name(owner_id):
 
 def get_consolidated_notes_for_deal(deal_id):
     """Get all consolidated notes for a deal"""
+    get_consolidated_notes_for_deal(deal_id)
     contact_ids = get_contact_ids_for_deal(deal_id)
     
     if not contact_ids:
@@ -1158,6 +1163,7 @@ def build_messages_from_dedup(dedup_df: pd.DataFrame, mode: str) -> pd.DataFrame
     return pd.DataFrame(out, columns=["CustomerName","Phone","Email","Cars","WhenExact","WhenRel","DealStages","Message"])
 
 def view_unsold_summary():
+    headers = {"Authorization": f"Bearer {HUBSPOT_TOKEN}"}
     st.subheader("📊  Unsold TD Summary")
     
     with st.form("unsold_summary_form"):
