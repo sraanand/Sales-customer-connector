@@ -1247,23 +1247,33 @@ def view_unsold_summary():
             # Get consolidated notes with debugging
             st.write(f"🔍 Debug - Processing Deal ID: {deal_id}")
             
-            # Step 1: Get contact IDs
-            contact_ids = get_contact_ids_for_deal(deal_id)
-            st.write(f"📞 Found {len(contact_ids)} contacts: {contact_ids}")
-            
-            if contact_ids:
-                # Step 2: Get notes for first contact (as test)
-                test_contact = contact_ids[0]
-                note_ids = get_contact_note_ids(test_contact)
-                st.write(f"📝 Contact {test_contact} has {len(note_ids)} notes: {note_ids[:3]}...")
+            # Step 1: Debug the contact association API call
+            try:
+                url = f"{HS_ROOT}/crm/v3/objects/deals/{deal_id}/associations/contacts"
+                st.write(f"🌐 API URL: {url}")
                 
-                if note_ids:
-                    # Step 3: Get actual note content
-                    notes_content = get_notes_content(note_ids[:2])  # Test first 2 notes
-                    st.write(f"📄 Sample note content: {len(notes_content)} notes retrieved")
-                    for i, note in enumerate(notes_content):
-                        body = note.get("properties", {}).get("hs_note_body", "")
-                        st.write(f"   Note {i+1}: {body[:100]}...")
+                response = requests.get(url, headers=headers, timeout=25)
+                st.write(f"📡 API Response Status: {response.status_code}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    st.write(f"📊 Raw API Response: {data}")
+                    
+                    results = data.get("results", [])
+                    st.write(f"📋 Results array: {results}")
+                    
+                    contact_ids = [result.get("toObjectId") or result.get("id") for result in results]
+                    st.write(f"📞 Extracted contact IDs: {contact_ids}")
+                    
+                else:
+                    st.write(f"❌ API Error: {response.text}")
+                    
+            except Exception as e:
+                st.write(f"🚫 Exception in API call: {str(e)}")
+            
+            # Use the original function to see what it returns
+            contact_ids = get_contact_ids_for_deal(deal_id)
+            st.write(f"📞 Function returned {len(contact_ids)} contacts: {contact_ids}")
             
             # Get consolidated notes
             notes = get_consolidated_notes_for_deal(deal_id)
