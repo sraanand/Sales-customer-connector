@@ -1227,7 +1227,9 @@ def view_unsold_summary():
         progress_bar = st.progress(0)
         status_text = st.empty()
         
-        for i, (_, deal_row) in enumerate(deals_df.iterrows()):
+        # Test with just the first deal for debugging
+        test_deals = deals_df.head(1)  # Only process first deal
+        for i, (_, deal_row) in enumerate(test_deals.iterrows()):
             deal_id = deal_row.get('hs_object_id', 'Unknown')
             customer_name = deal_row.get('full_name', 'Unknown Customer')
             vehicle = f"{deal_row.get('vehicle_make', '')} {deal_row.get('vehicle_model', '')}".strip()
@@ -1242,8 +1244,32 @@ def view_unsold_summary():
             }
             
             # Get consolidated notes using the correct function
+            # Get consolidated notes with debugging
+            st.write(f"🔍 Debug - Processing Deal ID: {deal_id}")
+            
+            # Step 1: Get contact IDs
+            contact_ids = get_contact_ids_for_deal(deal_id)
+            st.write(f"📞 Found {len(contact_ids)} contacts: {contact_ids}")
+            
+            if contact_ids:
+                # Step 2: Get notes for first contact (as test)
+                test_contact = contact_ids[0]
+                note_ids = get_contact_note_ids(test_contact)
+                st.write(f"📝 Contact {test_contact} has {len(note_ids)} notes: {note_ids[:3]}...")
+                
+                if note_ids:
+                    # Step 3: Get actual note content
+                    notes_content = get_notes_content(note_ids[:2])  # Test first 2 notes
+                    st.write(f"📄 Sample note content: {len(notes_content)} notes retrieved")
+                    for i, note in enumerate(notes_content):
+                        body = note.get("properties", {}).get("hs_note_body", "")
+                        st.write(f"   Note {i+1}: {body[:100]}...")
+            
+            # Get consolidated notes
             notes = get_consolidated_notes_for_deal(deal_id)
-            if not notes or notes.strip() == "":
+            st.write(f"🎯 Final consolidated notes length: {len(notes)} characters")
+            
+            if not notes or notes.strip() == "" or notes == "No notes":
                 notes = "No notes"
             
             # Analyze with ChatGPT
