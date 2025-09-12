@@ -4,6 +4,7 @@
 
 import os
 import time
+import json
 from datetime import datetime, date, timezone, timedelta
 from zoneinfo import ZoneInfo
 
@@ -359,6 +360,19 @@ def dedupe_users_with_audit(df: pd.DataFrame, *, use_conducted: bool) -> tuple[p
     dropped_df = pd.DataFrame(dropped_rows)
     return base, dropped_df
 
+def hs_get_owner_info(owner_id):
+    """Get owner information by ID"""
+    try:
+        url = f"{HS_ROOT}/crm/v3/owners/{owner_id}"
+        response = requests.get(url, headers=hs_headers(), timeout=10)
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return None
+    except Exception:
+        return None
+
 def build_messages_with_audit(dedup_df: pd.DataFrame, mode: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Build messages; also return a 'skipped' DF with reasons (e.g., missing phone, empty draft).
@@ -510,7 +524,8 @@ def get_owner_name(owner_id):
 
 def get_consolidated_notes_for_deal(deal_id):
     """Get all consolidated notes for a deal"""
-    get_consolidated_notes_for_deal(deal_id)
+    headers = {"Authorization": f"Bearer {HUBSPOT_TOKEN}"}
+    
     contact_ids = get_contact_ids_for_deal(deal_id)
     
     if not contact_ids:
@@ -660,68 +675,26 @@ Analyze why this customer didn't pay a deposit after their test drive and what t
         }
 
 def get_deals_by_owner_and_daterange(start_date, end_date, state_val, selected_owners):
-    """Get deals filtered by ticket owner, date range and state"""
+    """Get deals filtered by date range and state (owner filtering disabled for now)"""
     try:
         start_ms, _ = mel_day_bounds_to_epoch_ms(start_date)
         _, end_ms = mel_day_bounds_to_epoch_ms(end_date)
         
-        # Get all deals with stage "1119198253" (conducted) in date range
-        # Use the same pattern as view_manager() for date range searches
         raw_deals = hs_search_deals_by_date_property(
             pipeline_id=PIPELINE_ID,
-            stage_id="1119198253",  # Conducted stage
+            stage_id="1119198253",
             state_value=state_val,
             date_property="td_conducted_date",
-            date_eq_ms=None,  # Not searching for exact date
+            date_eq_ms=None,
             date_start_ms=start_ms,
             date_end_ms=end_ms,
             total_cap=HS_TOTAL_CAP
         )
         
-        # Check if we got results - raw_deals might be a list or None
         if raw_deals is None or (isinstance(raw_deals, list) and len(raw_deals) == 0):
             return pd.DataFrame()
             
-        deals_df = prepare_deals(raw_deals)  # Use prepare_deals like other workflows
-        
-        # Check if prepared deals DataFrame is empty
-        if deals_df.empty:
-            return pd.DataFrame()
-        
-        # Filter by ticket owners if specific ones selected
-        if selected_owners and "Select All" not in selected_owners:
-            # Convert display names back to email addresses
-            owner_email_map = {
-                "Thomas": "thomas.trindall@cars24.com",
-                "Ian": "zhan.hung@cars24.com", 
-                "Nihal": "nihalratan.makandar@cars24.com",
-                "Qasim": "qasim.aoso@cars24.com",
-                "Ankit": "Ankit.kumar@cars24.com",
-                "Akshit": "akshit.sood@cars24.com",
-                "Rash": "rashpal.puarr@cars24.com",
-                "Amaan": "amaandeep.cheema@cars24.com",
-                "Bish": "bishrul.irshad@cars24.com",
-                "Hammad": "hammad.hashmi@cars24.com"
-            }
-            
-            selected_emails = [owner_email_map.get(name, name) for name in selected_owners]
-            
-            # Filter deals by hubspot owner
-            if 'hubspot_owner_id' in deals_df.columns:
-                # Get owner details and filter by email
-                owner_ids = deals_df['hubspot_owner_id'].dropna().unique()
-                valid_owner_ids = []
-                
-                for owner_id in owner_ids:
-                    try:
-                        owner_info = hs_get_owner_info(owner_id)
-                        if owner_info and owner_info.get('email') in selected_emails:
-                            valid_owner_ids.append(owner_id)
-                    except:
-                        continue
-                
-                deals_df = deals_df[deals_df['hubspot_owner_id'].isin(valid_owner_ids)]
-        
+        deals_df = prepare_deals(raw_deals)
         return deals_df
         
     except Exception as e:
@@ -1233,9 +1206,7 @@ def view_unsold_summary():
         progress_bar = st.progress(0)
         status_text = st.empty()
         
-        # Test with just the first deal for debugging
-        test_deals = deals_df.head(1)  # Only process first deal
-        for i, (_, deal_row) in enumerate(test_deals.iterrows()):
+        for i, (_, deal_row) in enumerate(deals_df.iterrows()):
             deal_id = deal_row.get('hs_object_id', 'Unknown')
             customer_name = deal_row.get('full_name', 'Unknown Customer')
             vehicle = f"{deal_row.get('vehicle_make', '')} {deal_row.get('vehicle_model', '')}".strip()
