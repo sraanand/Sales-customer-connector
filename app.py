@@ -675,7 +675,7 @@ Analyze why this customer didn't pay a deposit after their test drive and what t
         }
 
 def get_deals_by_owner_and_daterange(start_date, end_date, state_val, selected_owners):
-    """Get deals filtered by date range and state (owner filtering disabled for now)"""
+    """Simplified version - get deals by date range and state only"""
     try:
         start_ms, _ = mel_day_bounds_to_epoch_ms(start_date)
         _, end_ms = mel_day_bounds_to_epoch_ms(end_date)
@@ -691,11 +691,10 @@ def get_deals_by_owner_and_daterange(start_date, end_date, state_val, selected_o
             total_cap=HS_TOTAL_CAP
         )
         
-        if raw_deals is None or (isinstance(raw_deals, list) and len(raw_deals) == 0):
+        if not raw_deals:
             return pd.DataFrame()
             
-        deals_df = prepare_deals(raw_deals)
-        return deals_df
+        return prepare_deals(raw_deals)
         
     except Exception as e:
         st.error(f"Error fetching deals: {str(e)}")
@@ -1136,7 +1135,6 @@ def build_messages_from_dedup(dedup_df: pd.DataFrame, mode: str) -> pd.DataFrame
     return pd.DataFrame(out, columns=["CustomerName","Phone","Email","Cars","WhenExact","WhenRel","DealStages","Message"])
 
 def view_unsold_summary():
-    headers = {"Authorization": f"Bearer {HUBSPOT_TOKEN}"}
     st.subheader("📊  Unsold TD Summary")
     
     with st.form("unsold_summary_form"):
@@ -1154,7 +1152,7 @@ def view_unsold_summary():
             with c2: d1 = st.date_input("Start date", value=today - timedelta(days=7))
             with c3: d2 = st.date_input("End date", value=today)
         
-        # State filter (same as Manager Follow-up)
+        # State filter
         state_options = hs_get_deal_property_options("car_location_at_time_of_sale")
         values = [o["value"] for o in state_options] if state_options else []
         labels = [o["label"] for o in state_options] if state_options else []
@@ -1170,151 +1168,113 @@ def view_unsold_summary():
         
         st.markdown("</div>", unsafe_allow_html=True)
         
-        # Ticket Owner selection
-        st.markdown("**Ticket Owner:**")
-        owner_options = [
-            "Select All",
-            "Thomas", "Ian", "Nihal", "Qasim", "Ankit", 
-            "Akshit", "Rash", "Amaan", "Bish", "Hammad"
-        ]
-        
-        selected_owners = st.multiselect(
-            "Choose ticket owners:",
-            options=owner_options,
-            default=["Select All"],
-            key="owner_select"
-        )
-        
-        # If "Select All" is chosen, select all others
-        if "Select All" in selected_owners:
-            selected_owners = owner_options[1:]  # All except "Select All"
+        # Ticket Owner selection (simplified)
+        st.markdown("**Ticket Owner:** (All owners for now)")
         
         go = st.form_submit_button("Analyze Unsold TDs", use_container_width=True)
     
     if go:
-        st.markdown("<span style='background:#4436F5;color:#FFFFFF;padding:4px 8px;border-radius:6px;'>Analyzing deals with ChatGPT…</span>", unsafe_allow_html=True)
-        
-        # Get deals
-        deals_df = get_deals_by_owner_and_daterange(d1, d2, state_val, selected_owners)
-        
-        if deals_df.empty:
-            st.info("No deals found matching the criteria.")
-            return
-        
-        # Process each deal
-        results = []
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
-        for i, (_, deal_row) in enumerate(deals_df.iterrows()):
-            deal_id = deal_row.get('hs_object_id', 'Unknown')
-            customer_name = deal_row.get('full_name', 'Unknown Customer')
-            vehicle = f"{deal_row.get('vehicle_make', '')} {deal_row.get('vehicle_model', '')}".strip()
-            
-            status_text.text(f"Processing {i+1}/{len(deals_df)}: {customer_name}")
-            progress_bar.progress((i + 1) / len(deals_df))
-            
-            # Create deal object in the format expected by consolidate_notes_for_deal
-            deal_obj = {
-                "id": deal_id,
-                "properties": deal_row.to_dict()
-            }
-            
-            # Get consolidated notes using the correct function
-            # Get consolidated notes with debugging
-            st.write(f"🔍 Debug - Processing Deal ID: {deal_id}")
-            
-            # Step 1: Debug the contact association API call
+        with st.spinner("Fetching and analyzing deals..."):
             try:
-                url = f"{HS_ROOT}/crm/v3/objects/deals/{deal_id}/associations/contacts"
-                st.write(f"🌐 API URL: {url}")
+                # Get deals
+                start_ms, _ = mel_day_bounds_to_epoch_ms(d1)
+                _, end_ms = mel_day_bounds_to_epoch_ms(d2)
                 
-                response = requests.get(url, headers=headers, timeout=25)
-                st.write(f"📡 API Response Status: {response.status_code}")
+                raw_deals = hs_search_deals_by_date_property(
+                    pipeline_id=PIPELINE_ID,
+                    stage_id="1119198253",
+                    state_value=state_val,
+                    date_property="td_conducted_date",
+                    date_eq_ms=None,
+                    date_start_ms=start_ms,
+                    date_end_ms=end_ms,
+                    total_cap=HS_TOTAL_CAP
+                )
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    st.write(f"📊 Raw API Response: {data}")
+                if not raw_deals or len(raw_deals) == 0:
+                    st.info("No deals found matching the criteria.")
+                    return
+                
+                deals_df = prepare_deals(raw_deals)
+                
+                if deals_df.empty:
+                    st.info("No deals found after processing.")
+                    return
+                
+                # Process each deal
+                results = []
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                for i, (_, deal_row) in enumerate(deals_df.iterrows()):
+                    deal_id = str(deal_row.get('hs_object_id', 'Unknown'))
+                    customer_name = str(deal_row.get('full_name', 'Unknown Customer'))
+                    vehicle = f"{deal_row.get('vehicle_make', '')} {deal_row.get('vehicle_model', '')}".strip() or "Unknown Vehicle"
                     
-                    results = data.get("results", [])
-                    st.write(f"📋 Results array: {results}")
+                    status_text.text(f"Processing {i+1}/{len(deals_df)}: {customer_name}")
+                    progress_bar.progress((i + 1) / len(deals_df))
                     
-                    contact_ids = [result.get("toObjectId") or result.get("id") for result in results]
-                    st.write(f"📞 Extracted contact IDs: {contact_ids}")
+                    # Get consolidated notes
+                    try:
+                        notes = get_consolidated_notes_for_deal(deal_id)
+                        if not notes or notes.strip() == "" or notes == "No notes":
+                            notes = "No notes"
+                    except Exception as e:
+                        notes = f"Error getting notes: {str(e)}"
                     
-                else:
-                    st.write(f"❌ API Error: {response.text}")
+                    # Analyze with ChatGPT
+                    try:
+                        analysis = analyze_with_chatgpt(notes, customer_name, vehicle)
+                    except Exception as e:
+                        analysis = {
+                            "summary": f"Analysis failed: {str(e)[:50]}...",
+                            "category": "Analysis failed",
+                            "next_steps": "Review manually"
+                        }
                     
+                    results.append({
+                        "Deal ID": deal_id,
+                        "Customer": customer_name,
+                        "Vehicle": vehicle,
+                        "Notes": notes[:200] + "..." if len(notes) > 200 else notes,
+                        "Summary": analysis.get("summary", "No summary"),
+                        "Category": analysis.get("category", "Unknown"),
+                        "Next Steps": analysis.get("next_steps", "No steps")
+                    })
+                
+                progress_bar.empty()
+                status_text.empty()
+                
+                # Store results
+                st.session_state["unsold_results"] = results
+                st.success(f"Successfully analyzed {len(results)} deals!")
+                
             except Exception as e:
-                st.write(f"🚫 Exception in API call: {str(e)}")
-            
-            # Use the original function to see what it returns
-            contact_ids = get_contact_ids_for_deal(deal_id)
-            st.write(f"📞 Function returned {len(contact_ids)} contacts: {contact_ids}")
-            
-            # Get consolidated notes
-            notes = get_consolidated_notes_for_deal(deal_id)
-            st.write(f"🎯 Final consolidated notes length: {len(notes)} characters")
-            
-            if not notes or notes.strip() == "" or notes == "No notes":
-                notes = "No notes"
-            
-            # Analyze with ChatGPT
-            analysis = analyze_with_chatgpt(notes, customer_name, vehicle)
-            
-            results.append({
-                "Deal ID": deal_id,
-                "Customer": customer_name,
-                "Vehicle": vehicle or "Unknown Vehicle",
-                "Notes": notes,
-                "Summary": analysis["summary"],
-                "Category": analysis["category"],
-                "Next Steps": analysis["next_steps"]
-            })
-        
-        progress_bar.empty()
-        status_text.empty()
-        
-        # Store results in session state
-        st.session_state["unsold_results"] = results
+                st.error(f"Error during analysis: {str(e)}")
+                return
     
-    # Display results if available
+    # Display results
     results = st.session_state.get("unsold_results")
     if results:
-        st.markdown(f"#### <span style='color:#000000;'>Unsold Test Drive Analysis ({len(results)} deals)</span>", unsafe_allow_html=True)
+        st.markdown(f"#### Unsold Test Drive Analysis ({len(results)} deals)")
         
-        # Create DataFrame for display
+        # Create DataFrame
         results_df = pd.DataFrame(results)
         
-        # Configure column display
-        column_config = {
-            "Deal ID": st.column_config.TextColumn("Deal ID", width="small"),
-            "Customer": st.column_config.TextColumn("Customer", width="medium"),
-            "Vehicle": st.column_config.TextColumn("Vehicle", width="medium"),
-            "Notes": st.column_config.TextColumn("Notes", width="large"),
-            "Summary": st.column_config.TextColumn("Summary", width="large"),
-            "Category": st.column_config.TextColumn("Category", width="medium"),
-            "Next Steps": st.column_config.TextColumn("Next Steps", width="large")
-        }
-        
-        st.dataframe(
-            results_df,
-            use_container_width=True,
-            column_config=column_config,
-            hide_index=True
-        )
+        # Simple table display
+        st.dataframe(results_df, use_container_width=True, hide_index=True)
         
         # Category breakdown
-        st.markdown("#### <span style='color:#000000;'>Category Breakdown</span>", unsafe_allow_html=True)
-        category_counts = results_df["Category"].value_counts()
-        
-        category_df = pd.DataFrame({
-            "Category": category_counts.index,
-            "Count": category_counts.values,
-            "Percentage": (category_counts.values / len(results_df) * 100).round(1)
-        })
-        
-        st.dataframe(category_df, use_container_width=True, hide_index=True)
+        if len(results) > 1:
+            st.markdown("#### Category Breakdown")
+            category_counts = results_df["Category"].value_counts()
+            
+            category_df = pd.DataFrame({
+                "Category": category_counts.index,
+                "Count": category_counts.values
+            })
+            
+            st.dataframe(category_df, use_container_width=True, hide_index=True)
 
 # ============ Rendering helpers ============
 def header():
