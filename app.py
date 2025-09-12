@@ -386,6 +386,209 @@ def build_messages_with_audit(dedup_df: pd.DataFrame, mode: str) -> tuple[pd.Dat
     skipped_df = pd.DataFrame(skipped, columns=["Customer","Email","Cars","Reason"])
     return msgs_df, skipped_df
 
+def fix_json_response(response_text):
+    """Try to fix common JSON formatting issues from ChatGPT"""
+    try:
+        # Remove any text before the first {
+        start_idx = response_text.find('{')
+        if start_idx > 0:
+            response_text = response_text[start_idx:]
+        
+        # Remove any text after the last }
+        end_idx = response_text.rfind('}')
+        if end_idx > 0:
+            response_text = response_text[:end_idx + 1]
+        
+        # Fix common escape issues
+        response_text = response_text.replace('\n', '\\n').replace('\t', '\\t')
+        
+        # Try to parse and return if successful
+        json.loads(response_text)
+        return response_text
+    except:
+        return None
+
+def create_fallback_analysis(raw_response, customer_name):
+    """Create a structured response when JSON parsing fails"""
+    lines = raw_response.split('\n')
+    
+    summary = "Analysis incomplete due to formatting issues"
+    category = "No clear reason documented"
+    next_steps = "Review notes manually and contact customer"
+    
+    # Try to extract summary from response
+    for line in lines:
+        if any(word in line.lower() for word in ['summary', 'what happened', 'customer']):
+            if len(line.strip()) > 10:
+                summary = line.strip()[:100]
+                break
+    
+    return {
+        "summary": summary,
+        "category": category,
+        "next_steps": next_steps,
+        "raw_response": raw_response[:200] + "..." if len(raw_response) > 200 else raw_response
+    }
+
+def analyze_with_chatgpt(notes_text, customer_name="Customer", vehicle="Vehicle"):
+    """Analyze customer notes using ChatGPT with enhanced debugging"""
+    if not notes_text or notes_text == "No notes":
+        return {
+            "summary": "No notes available for analysis",
+            "category": "No clear reason documented",
+            "next_steps": "Contact customer to understand their experience"
+        }
+    
+    system_prompt = """You are analyzing customer interaction notes from a car dealership to understand why customers didn't pay a deposit after test drives.
+
+CRITICAL: You must respond with ONLY valid JSON in exactly this format - no extra text, no explanations, just the JSON:
+
+{
+  "summary": "1-2 line summary of what specifically happened during customer interaction and why deposit was not paid",
+  "category": "choose one category from the list below", 
+  "next_steps": "specific actionable next step for the sales team to re-engage this customer"
+}
+
+Categories (choose exactly one):
+- Price/Finance Issues
+- Vehicle Condition/Quality  
+- Customer Not Ready
+- Comparison Shopping
+- Feature/Specification Issues
+- Trust/Service Issues
+- External Factors
+- Already Purchased Elsewhere
+- Changed Mind/Lost Interest
+- No clear reason documented
+
+Rules:
+- Response must be valid JSON only
+- Keep summary under 150 characters
+- Keep next_steps under 100 characters
+- Use only the categories listed above exactly as written"""
+
+    user_prompt = f"""Customer: {customer_name}
+Vehicle: {vehicle}
+
+Customer interaction notes from dealership:
+{notes_text}
+
+Analyze why this customer didn't pay a deposit after their test drive and what the sales team should do next."""
+
+    try:
+        import openai
+        
+        # Set API key
+        openai_api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", "")
+        if not openai_api_key:
+            return {
+                "summary": "OpenAI API key not configured",
+                "category": "Analysis failed",
+                "next_steps": "Configure OpenAI API key in secrets"
+            }
+
+        response = openai.chat.completions.create(
+            api_key=openai_api_key,
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.3,
+            max_tokens=250
+        )
+        
+        response_text = response.choices[0].message.content.strip()
+        
+        # Try to parse JSON
+        try:
+            result = json.loads(response_text)
+        except json.JSONDecodeError as json_err:
+            # Try to fix common JSON issues
+            fixed_response = fix_json_response(response_text)
+            if fixed_response:
+                try:
+                    result = json.loads(fixed_response)
+                except:
+                    return create_fallback_analysis(response_text, customer_name)
+            else:
+                return create_fallback_analysis(response_text, customer_name)
+        
+        return {
+            "summary": result.get("summary", "Analysis incomplete"),
+            "category": result.get("category", "No clear reason documented"),
+            "next_steps": result.get("next_steps", "Review customer interaction manually")
+        }
+        
+    except Exception as e:
+        return {
+            "summary": f"ChatGPT analysis failed: {str(e)[:50]}...",
+            "category": "Analysis failed",
+            "next_steps": "Review notes manually and contact customer"
+        }
+
+def get_deals_by_owner_and_daterange(start_date, end_date, state_val, selected_owners):
+    """Get deals filtered by ticket owner, date range and state"""
+    try:
+        start_ms, _ = mel_day_bounds_to_epoch_ms(start_date)
+        _, end_ms = mel_day_bounds_to_epoch_ms(end_date)
+        
+        # Get all deals with stage "1119198253" (conducted) in date range
+        raw_deals = hs_search_deals_by_date_property(
+            pipeline_id=PIPELINE_ID,
+            stage_id="1119198253",  # Conducted stage
+            state_value=state_val,
+            date_property="td_conducted_date",
+            date_start_ms=start_ms,
+            date_end_ms=end_ms,
+            total_cap=HS_TOTAL_CAP
+        )
+        
+        if not raw_deals:
+            return pd.DataFrame()
+            
+        deals_df = pd.DataFrame(raw_deals)
+        
+        # Filter by ticket owners if specific ones selected
+        if selected_owners and "Select All" not in selected_owners:
+            # Convert display names back to email addresses
+            owner_email_map = {
+                "Thomas": "thomas.trindall@cars24.com",
+                "Ian": "zhan.hung@cars24.com", 
+                "Nihal": "nihalratan.makandar@cars24.com",
+                "Qasim": "qasim.aoso@cars24.com",
+                "Ankit": "Ankit.kumar@cars24.com",
+                "Akshit": "akshit.sood@cars24.com",
+                "Rash": "rashpal.puarr@cars24.com",
+                "Amaan": "amaandeep.cheema@cars24.com",
+                "Bish": "bishrul.irshad@cars24.com",
+                "Hammad": "hammad.hashmi@cars24.com"
+            }
+            
+            selected_emails = [owner_email_map.get(name, name) for name in selected_owners]
+            
+            # Filter deals by hubspot owner
+            if 'hubspot_owner_id' in deals_df.columns:
+                # Get owner details and filter by email
+                owner_ids = deals_df['hubspot_owner_id'].dropna().unique()
+                valid_owner_ids = []
+                
+                for owner_id in owner_ids:
+                    try:
+                        owner_info = hs_get_owner_info(owner_id)
+                        if owner_info and owner_info.get('email') in selected_emails:
+                            valid_owner_ids.append(owner_id)
+                    except:
+                        continue
+                
+                deals_df = deals_df[deals_df['hubspot_owner_id'].isin(valid_owner_ids)]
+        
+        return deals_df
+        
+    except Exception as e:
+        st.error(f"Error fetching deals: {str(e)}")
+        return pd.DataFrame()
+
 # ============ NEW: Appointment ID based car filtering ============
 def get_deals_by_appointment_id(appointment_id: str) -> list[str]:
     """Get all deal IDs that have the given appointment_id"""
@@ -819,6 +1022,146 @@ def build_messages_from_dedup(dedup_df: pd.DataFrame, mode: str) -> pd.DataFrame
                     "DealStages": str(row.get("DealStages") or ""), "Message": msg})
     return pd.DataFrame(out, columns=["CustomerName","Phone","Email","Cars","WhenExact","WhenRel","DealStages","Message"])
 
+def view_unsold_summary():
+    st.subheader("📊  Unsold TD Summary")
+    
+    with st.form("unsold_summary_form"):
+        st.markdown('<div class="form-row">', unsafe_allow_html=True)
+        c1,c2,c3,c4 = st.columns([1.4,1.6,1.6,2.0])
+        
+        with c1: 
+            mode = st.radio("Mode", ["Single date","Date range"], horizontal=True, index=1)
+        
+        today = datetime.now(MEL_TZ).date()
+        if mode=="Single date":
+            with c2: d1 = st.date_input("Date", value=today); d2 = d1
+            with c3: pass
+        else:
+            with c2: d1 = st.date_input("Start date", value=today - timedelta(days=7))
+            with c3: d2 = st.date_input("End date", value=today)
+        
+        # State filter (same as Manager Follow-up)
+        state_options = hs_get_deal_property_options("car_location_at_time_of_sale")
+        values = [o["value"] for o in state_options] if state_options else []
+        labels = [o["label"] for o in state_options] if state_options else []
+        def_val = "VIC" if "VIC" in values else (values[0] if values else "")
+        
+        with c4:
+            if labels:
+                chosen_label = st.selectbox("Vehicle state", labels, index=(values.index("VIC") if "VIC" in values else 0))
+                label_to_val = {o["label"]:o["value"] for o in state_options}
+                state_val = label_to_val.get(chosen_label, def_val)
+            else:
+                state_val = st.text_input("Vehicle state", value=def_val)
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Ticket Owner selection
+        st.markdown("**Ticket Owner:**")
+        owner_options = [
+            "Select All",
+            "Thomas", "Ian", "Nihal", "Qasim", "Ankit", 
+            "Akshit", "Rash", "Amaan", "Bish", "Hammad"
+        ]
+        
+        selected_owners = st.multiselect(
+            "Choose ticket owners:",
+            options=owner_options,
+            default=["Select All"],
+            key="owner_select"
+        )
+        
+        # If "Select All" is chosen, select all others
+        if "Select All" in selected_owners:
+            selected_owners = owner_options[1:]  # All except "Select All"
+        
+        go = st.form_submit_button("Analyze Unsold TDs", use_container_width=True)
+    
+    if go:
+        st.markdown("<span style='background:#4436F5;color:#FFFFFF;padding:4px 8px;border-radius:6px;'>Analyzing deals with ChatGPT…</span>", unsafe_allow_html=True)
+        
+        # Get deals
+        deals_df = get_deals_by_owner_and_daterange(d1, d2, state_val, selected_owners)
+        
+        if deals_df.empty:
+            st.info("No deals found matching the criteria.")
+            return
+        
+        # Process each deal
+        results = []
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        for i, (_, deal) in enumerate(deals_df.iterrows()):
+            deal_id = deal.get('hs_object_id', 'Unknown')
+            customer_name = deal.get('full_name', 'Unknown Customer')
+            vehicle = f"{deal.get('vehicle_make', '')} {deal.get('vehicle_model', '')}".strip()
+            
+            status_text.text(f"Processing {i+1}/{len(deals_df)}: {customer_name}")
+            progress_bar.progress((i + 1) / len(deals_df))
+            
+            # Get consolidated notes
+            notes = get_consolidated_notes_for_deal(deal_id)
+            if not notes or notes.strip() == "":
+                notes = "No notes"
+            
+            # Analyze with ChatGPT
+            analysis = analyze_with_chatgpt(notes, customer_name, vehicle)
+            
+            results.append({
+                "Deal ID": deal_id,
+                "Customer": customer_name,
+                "Vehicle": vehicle or "Unknown Vehicle",
+                "Notes": notes,
+                "Summary": analysis["summary"],
+                "Category": analysis["category"],
+                "Next Steps": analysis["next_steps"]
+            })
+        
+        progress_bar.empty()
+        status_text.empty()
+        
+        # Store results in session state
+        st.session_state["unsold_results"] = results
+    
+    # Display results if available
+    results = st.session_state.get("unsold_results")
+    if results:
+        st.markdown(f"#### <span style='color:#000000;'>Unsold Test Drive Analysis ({len(results)} deals)</span>", unsafe_allow_html=True)
+        
+        # Create DataFrame for display
+        results_df = pd.DataFrame(results)
+        
+        # Configure column display
+        column_config = {
+            "Deal ID": st.column_config.TextColumn("Deal ID", width="small"),
+            "Customer": st.column_config.TextColumn("Customer", width="medium"),
+            "Vehicle": st.column_config.TextColumn("Vehicle", width="medium"),
+            "Notes": st.column_config.TextColumn("Notes", width="large"),
+            "Summary": st.column_config.TextColumn("Summary", width="large"),
+            "Category": st.column_config.TextColumn("Category", width="medium"),
+            "Next Steps": st.column_config.TextColumn("Next Steps", width="large")
+        }
+        
+        st.dataframe(
+            results_df,
+            use_container_width=True,
+            column_config=column_config,
+            hide_index=True
+        )
+        
+        # Category breakdown
+        st.markdown("#### <span style='color:#000000;'>Category Breakdown</span>", unsafe_allow_html=True)
+        category_counts = results_df["Category"].value_counts()
+        
+        category_df = pd.DataFrame({
+            "Category": category_counts.index,
+            "Count": category_counts.values,
+            "Percentage": (category_counts.values / len(results_df) * 100).round(1)
+        })
+        
+        st.dataframe(category_df, use_container_width=True, hide_index=True)
+
 # ============ Rendering helpers ============
 def header():
     cols = st.columns([1, 6, 1.2])
@@ -840,16 +1183,18 @@ def header():
     st.markdown('<hr class="div"/>', unsafe_allow_html=True)
 
 def ctas():
-    c1,c2,c3 = st.columns(3)
+    c1,c2 = st.columns(2)
     with c1:
         if st.button("🛣️  Test Drive Reminders\n\n• Friendly reminders  • TD date + state", key="cta1"):
             st.session_state["view"]="reminders"
-    with c2:
         if st.button("👔  Manager Follow-Ups\n\n• After TD conducted  • Single date or range", key="cta2"):
             st.session_state["view"]="manager"
-    with c3:
+    with c2:
         if st.button("🕰️  Old Leads by Appointment ID\n\n• Re-engage older enquiries  • Skips active purchases", key="cta3"):
             st.session_state["view"]="old"
+        if st.button("📊  Unsold TD Summary\n\n• ChatGPT analysis  • Date range + ticket owner", key="cta4"):
+            st.session_state["view"]="unsold_summary"
+    
     st.markdown("""
     <script>
       const btns = window.parent.document.querySelectorAll('button[kind="secondary"]');
@@ -1292,5 +1637,7 @@ def header_and_route():
         view_manager()
     elif v == "old":
         view_old()
+    elif v == "unsold_summary":
+        view_unsold_summary()
 
 header_and_route()
