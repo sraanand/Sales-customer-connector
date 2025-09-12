@@ -119,17 +119,50 @@ input, select, textarea {{
 }}
 label, .stSelectbox label, .stDateInput label, .stTextInput label {{ color: #000000 !important; }}
 
-/* Wrap long text inside data editor / dataframes */
-[data-testid="stDataFrame"] div[role="cell"] {{
+/* Enhanced text wrapping for ALL dataframes and tables */
+[data-testid="stDataFrame"] div[role="cell"],
+[data-testid="stDataFrame"] div[role="columnheader"],
+[data-testid="stDataFrame"] div[role="gridcell"] {{
   white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
   line-height: 1.4 !important;
+  max-width: none !important;
+  height: auto !important;
+  min-height: 40px !important;
+  padding: 8px 12px !important;
+  vertical-align: top !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
 }}
-[data-testid="stDataFrame"] * {{ color:#000000 !important; }}
-[data-testid="stDataFrame"] div[data-testid="stVerticalBlock"] {{ background:#FFFFFF !important; }}
-[data-testid="stTable"] td, [data-testid="stTable"] th {{ color:#000000 !important; }}
+
+[data-testid="stDataFrame"] * {{ 
+  color:#000000 !important; 
+  white-space: pre-wrap !important;
+}}
+
+[data-testid="stDataFrame"] div[data-testid="stVerticalBlock"] {{ 
+  background:#FFFFFF !important; 
+}}
+
+[data-testid="stTable"] td, 
+[data-testid="stTable"] th {{ 
+  color:#000000 !important; 
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.4 !important;
+  padding: 8px 12px !important;
+  vertical-align: top !important;
+  max-width: 300px !important;
+  height: auto !important;
+}}
 
 /* Enhanced text wrapping for data editor */
-[data-testid="stDataEditor"] div[role="gridcell"] {{
+[data-testid="stDataEditor"] div[role="gridcell"],
+[data-testid="stDataEditor"] div[role="columnheader"] {{
   white-space: pre-wrap !important;
   word-wrap: break-word !important;
   word-break: break-word !important;
@@ -138,15 +171,21 @@ label, .stSelectbox label, .stDateInput label, .stTextInput label {{ color: #000
   max-width: none !important;
   height: auto !important;
   min-height: 60px !important;
+  padding: 8px 12px !important;
+  vertical-align: top !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
 }}
 
+/* Special handling for SMS draft column in data editor */
 [data-testid="stDataEditor"] div[role="gridcell"]:nth-child(4) {{
   white-space: pre-wrap !important;
   word-wrap: break-word !important;
   overflow: visible !important;
   text-overflow: unset !important;
   min-height: 80px !important;
-  padding: 8px !important;
+  padding: 8px 12px !important;
+  max-width: 400px !important;
 }}
 
 [data-testid="stDataEditor"] div[role="row"] {{
@@ -159,19 +198,66 @@ label, .stSelectbox label, .stDateInput label, .stTextInput label {{ color: #000
   overflow: visible !important;
 }}
 
-[data-testid="stDataEditor"] div[role="columnheader"] {{
+/* Ensure table containers allow proper height */
+[data-testid="stDataFrame"],
+[data-testid="stTable"],
+[data-testid="stDataEditor"] {{
   height: auto !important;
-  min-height: 40px !important;
+  min-height: auto !important;
+  overflow: visible !important;
 }}
 
-/* Preview table legacy (kept if we render) */
+/* Force word wrapping on any table-like structure */
+.stDataFrame table,
+.stTable table,
+.stDataEditor table {{
+  table-layout: auto !important;
+  width: 100% !important;
+}}
+
+.stDataFrame td,
+.stDataFrame th,
+.stTable td,
+.stTable th,
+.stDataEditor td,
+.stDataEditor th {{
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.4 !important;
+  padding: 8px 12px !important;
+  vertical-align: top !important;
+  max-width: 300px !important;
+  height: auto !important;
+}}
+
+/* Preview table legacy (enhanced wrapping) */
 .preview-table table {{
-  background: #FFFFFF !important; color: #000000 !important; border-collapse: collapse !important; width: 100%;
+  background: #FFFFFF !important; 
+  color: #000000 !important; 
+  border-collapse: collapse !important; 
+  width: 100%;
+  table-layout: auto !important;
 }}
-.preview-table th, .preview-table td {{
-  border: 1px solid #000000 !important; padding: 8px 12px !important; vertical-align: top !important;
+
+.preview-table th, 
+.preview-table td {{
+  border: 1px solid #000000 !important; 
+  padding: 8px 12px !important; 
+  vertical-align: top !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.4 !important;
+  max-width: 300px !important;
+  height: auto !important;
 }}
-.preview-table th {{ font-weight: 700 !important; }}
+
+.preview-table th {{ 
+  font-weight: 700 !important; 
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1263,7 +1349,20 @@ def view_unsold_summary():
         results_df = pd.DataFrame(results)
         
         # Simple table display
-        st.dataframe(results_df, use_container_width=True, hide_index=True)
+        st.dataframe(
+            results_df, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "Deal ID": st.column_config.TextColumn("Deal ID", width="small"),
+                "Customer": st.column_config.TextColumn("Customer", width="medium"),
+                "Vehicle": st.column_config.TextColumn("Vehicle", width="medium"), 
+                "Notes": st.column_config.TextColumn("Notes", width="large"),
+                "Summary": st.column_config.TextColumn("Summary", width="large"),
+                "Category": st.column_config.TextColumn("Category", width="medium"),
+                "Next Steps": st.column_config.TextColumn("Next Steps", width="large")
+            }
+        )
         
         # Category breakdown
         if len(results) > 1:
