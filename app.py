@@ -534,11 +534,13 @@ def get_deals_by_owner_and_daterange(start_date, end_date, state_val, selected_o
         _, end_ms = mel_day_bounds_to_epoch_ms(end_date)
         
         # Get all deals with stage "1119198253" (conducted) in date range
+        # Use the same pattern as view_manager() for date range searches
         raw_deals = hs_search_deals_by_date_property(
             pipeline_id=PIPELINE_ID,
             stage_id="1119198253",  # Conducted stage
             state_value=state_val,
             date_property="td_conducted_date",
+            date_eq_ms=None,  # Not searching for exact date
             date_start_ms=start_ms,
             date_end_ms=end_ms,
             total_cap=HS_TOTAL_CAP
@@ -547,7 +549,7 @@ def get_deals_by_owner_and_daterange(start_date, end_date, state_val, selected_o
         if not raw_deals:
             return pd.DataFrame()
             
-        deals_df = pd.DataFrame(raw_deals)
+        deals_df = prepare_deals(raw_deals)  # Use prepare_deals like other workflows
         
         # Filter by ticket owners if specific ones selected
         if selected_owners and "Select All" not in selected_owners:
