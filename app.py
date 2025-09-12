@@ -546,10 +546,15 @@ def get_deals_by_owner_and_daterange(start_date, end_date, state_val, selected_o
             total_cap=HS_TOTAL_CAP
         )
         
-        if not raw_deals:
+        # Check if we got results - raw_deals might be a list or None
+        if raw_deals is None or (isinstance(raw_deals, list) and len(raw_deals) == 0):
             return pd.DataFrame()
             
         deals_df = prepare_deals(raw_deals)  # Use prepare_deals like other workflows
+        
+        # Check if prepared deals DataFrame is empty
+        if deals_df.empty:
+            return pd.DataFrame()
         
         # Filter by ticket owners if specific ones selected
         if selected_owners and "Select All" not in selected_owners:
@@ -590,6 +595,7 @@ def get_deals_by_owner_and_daterange(start_date, end_date, state_val, selected_o
     except Exception as e:
         st.error(f"Error fetching deals: {str(e)}")
         return pd.DataFrame()
+
 
 # ============ NEW: Appointment ID based car filtering ============
 def get_deals_by_appointment_id(appointment_id: str) -> list[str]:
