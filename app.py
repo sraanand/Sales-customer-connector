@@ -634,8 +634,9 @@ Analyze why this customer didn't pay a deposit after their test drive and what t
                 "next_steps": "Configure OpenAI API key in secrets"
             }
 
+        openai.api_key = openai_api_key
+        
         response = openai.chat.completions.create(
-            api_key=openai_api_key,
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt},
