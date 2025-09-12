@@ -429,6 +429,133 @@ def create_fallback_analysis(raw_response, customer_name):
         "next_steps": next_steps,
         "raw_response": raw_response[:200] + "..." if len(raw_response) > 200 else raw_response
     }
+def get_contact_ids_for_deal(deal_id):
+    """Get contact IDs associated with a deal"""
+    try:
+        url = f"{HS_ROOT}/crm/v3/objects/deals/{deal_id}/associations/contacts"
+        response = requests.get(url, headers=headers, timeout=25)
+        
+        if response.status_code == 200:
+            data = response.json()
+            results = data.get("results", [])
+            return [result.get("toObjectId") or result.get("id") for result in results]
+        else:
+            return []
+    except Exception:
+        return []
+
+def get_contact_note_ids(contact_id):
+    """Get note IDs for a contact"""
+    try:
+        url = f"{HS_ROOT}/crm/v3/objects/contacts/{contact_id}/associations/notes"
+        response = requests.get(url, headers=headers, timeout=25)
+        
+        if response.status_code == 200:
+            data = response.json()
+            results = data.get("results", [])
+            note_ids = [result.get("toObjectId") or result.get("id") for result in results]
+            return [str(nid) for nid in note_ids if nid]
+        else:
+            return []
+    except Exception:
+        return []
+
+def get_notes_content(note_ids):
+    """Get note content"""
+    if not note_ids:
+        return []
+    
+    try:
+        url = f"{HS_ROOT}/crm/v3/objects/notes/batch/read"
+        payload = {
+            "properties": ["hs_note_body", "hs_timestamp", "hs_createdate", "hubspot_owner_id"],
+            "inputs": [{"id": str(note_id)} for note_id in note_ids]
+        }
+        
+        response = requests.post(url, headers=headers, json=payload, timeout=25)
+        
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("results", [])
+        else:
+            return []
+    except:
+        return []
+
+def get_owner_name(owner_id):
+    """Get owner name"""
+    if not owner_id:
+        return "Unknown User"
+    
+    try:
+        url = f"{HS_ROOT}/crm/v3/owners/{owner_id}"
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            first_name = data.get("firstName", "")
+            last_name = data.get("lastName", "")
+            if first_name or last_name:
+                return f"{first_name} {last_name}".strip()
+            else:
+                return data.get("email", f"User {owner_id}")
+        else:
+            return f"User {owner_id}"
+    except:
+        return f"User {owner_id}"
+
+def get_consolidated_notes_for_deal(deal_id):
+    """Get all consolidated notes for a deal"""
+    contact_ids = get_contact_ids_for_deal(deal_id)
+    
+    if not contact_ids:
+        return "No notes"
+    
+    all_formatted_notes = []
+    
+    for contact_id in contact_ids:
+        note_ids = get_contact_note_ids(contact_id)
+        
+        if note_ids:
+            notes = get_notes_content(note_ids)
+            
+            for note in notes:
+                props = note.get("properties", {})
+                body = props.get("hs_note_body", "")
+                timestamp = props.get("hs_timestamp") or props.get("hs_createdate", "")
+                owner_id = props.get("hubspot_owner_id")
+                
+                if body and body.strip():
+                    # Clean HTML from body
+                    import re
+                    clean_body = re.sub(r'<[^>]+>', '', body).strip()
+                    clean_body = clean_body.replace('&nbsp;', ' ').replace('&amp;', '&')
+                    
+                    if clean_body:
+                        # Format timestamp
+                        date_str = "Unknown Date"
+                        if timestamp:
+                            try:
+                                from datetime import datetime
+                                if len(str(timestamp)) > 10:  # milliseconds
+                                    dt = datetime.fromtimestamp(int(timestamp) / 1000)
+                                else:  # seconds
+                                    dt = datetime.fromtimestamp(int(timestamp))
+                                date_str = dt.strftime("%Y-%m-%d %H:%M")
+                            except:
+                                date_str = str(timestamp)
+                        
+                        # Get owner name
+                        owner_name = get_owner_name(owner_id)
+                        
+                        formatted_note = f"[{date_str}] ({owner_name}) {clean_body}"
+                        all_formatted_notes.append(formatted_note)
+    
+    if all_formatted_notes:
+        return "\n\n".join(all_formatted_notes)
+    else:
+        return "No notes"
+
 
 def analyze_with_chatgpt(notes_text, customer_name="Customer", vehicle="Vehicle"):
     """Analyze customer notes using ChatGPT with enhanced debugging"""
@@ -1115,7 +1242,7 @@ def view_unsold_summary():
             }
             
             # Get consolidated notes using the correct function
-            notes = consolidate_notes_for_deal(deal_obj)
+            notes = get_consolidated_notes_for_deal(deal_id)
             if not notes or notes.strip() == "":
                 notes = "No notes"
             
@@ -1175,7 +1302,6 @@ def view_unsold_summary():
         })
         
         st.dataframe(category_df, use_container_width=True, hide_index=True)
-
 
 # ============ Rendering helpers ============
 def header():
