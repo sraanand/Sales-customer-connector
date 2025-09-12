@@ -691,7 +691,7 @@ def get_deals_by_owner_and_daterange(start_date, end_date, state_val, selected_o
             total_cap=HS_TOTAL_CAP
         )
         
-        if not raw_deals:
+        if raw_deals is None or (isinstance(raw_deals, list) and len(raw_deals) == 0) or (isinstance(raw_deals, pd.DataFrame) and raw_deals.empty):
             return pd.DataFrame()
             
         return prepare_deals(raw_deals)
@@ -1191,7 +1191,7 @@ def view_unsold_summary():
                     total_cap=HS_TOTAL_CAP
                 )
                 
-                if not raw_deals or len(raw_deals) == 0:
+                if raw_deals is None or (isinstance(raw_deals, list) and len(raw_deals) == 0) or (isinstance(raw_deals, pd.DataFrame) and raw_deals.empty):
                     st.info("No deals found matching the criteria.")
                     return
                 
