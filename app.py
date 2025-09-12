@@ -1100,16 +1100,22 @@ def view_unsold_summary():
         progress_bar = st.progress(0)
         status_text = st.empty()
         
-        for i, (_, deal) in enumerate(deals_df.iterrows()):
-            deal_id = deal.get('hs_object_id', 'Unknown')
-            customer_name = deal.get('full_name', 'Unknown Customer')
-            vehicle = f"{deal.get('vehicle_make', '')} {deal.get('vehicle_model', '')}".strip()
+        for i, (_, deal_row) in enumerate(deals_df.iterrows()):
+            deal_id = deal_row.get('hs_object_id', 'Unknown')
+            customer_name = deal_row.get('full_name', 'Unknown Customer')
+            vehicle = f"{deal_row.get('vehicle_make', '')} {deal_row.get('vehicle_model', '')}".strip()
             
             status_text.text(f"Processing {i+1}/{len(deals_df)}: {customer_name}")
             progress_bar.progress((i + 1) / len(deals_df))
             
-            # Get consolidated notes
-            notes = get_consolidated_notes_for_deal(deal_id)
+            # Create deal object in the format expected by consolidate_notes_for_deal
+            deal_obj = {
+                "id": deal_id,
+                "properties": deal_row.to_dict()
+            }
+            
+            # Get consolidated notes using the correct function
+            notes = consolidate_notes_for_deal(deal_obj)
             if not notes or notes.strip() == "":
                 notes = "No notes"
             
@@ -1169,6 +1175,7 @@ def view_unsold_summary():
         })
         
         st.dataframe(category_df, use_container_width=True, hide_index=True)
+
 
 # ============ Rendering helpers ============
 def header():
