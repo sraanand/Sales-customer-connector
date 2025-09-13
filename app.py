@@ -1460,8 +1460,20 @@ def view_unsold_summary():
             # Create detailed table
             detailed_data = []
             for result in cat_results:
+                # Format the test drive date
+                td_date = result.get("TD Date", "Unknown")
+                if pd.notna(td_date) and td_date != "Unknown":
+                    try:
+                        if isinstance(td_date, str):
+                            td_date = pd.to_datetime(td_date).strftime("%d %b %Y")
+                        else:
+                            td_date = td_date.strftime("%d %b %Y")
+                    except:
+                        td_date = str(td_date)
+                
                 detailed_data.append({
                     "Customer": result["Customer"],
+                    "TD Date": td_date,
                     "Vehicles & IDs": result["Vehicle"],
                     "Notes Summary": result["Summary"],
                     "Next Steps": result["Next Steps"]
@@ -1473,10 +1485,11 @@ def view_unsold_summary():
                 use_container_width=True, 
                 hide_index=True,
                 column_config={
-                    "Customer": st.column_config.TextColumn("Customer", width=200),
-                    "Vehicles & IDs": st.column_config.TextColumn("Vehicles & IDs", width=300),
-                    "Notes Summary": st.column_config.TextColumn("Notes Summary", width=400),
-                    "Next Steps": st.column_config.TextColumn("Next Steps", width=200)
+                    "Customer": st.column_config.TextColumn("Customer", width=180),
+                    "TD Date": st.column_config.TextColumn("TD Date", width=120),
+                    "Vehicles & IDs": st.column_config.TextColumn("Vehicles & IDs", width=280),
+                    "Notes Summary": st.column_config.TextColumn("Notes Summary", width=350),
+                    "Next Steps": st.column_config.TextColumn("Next Steps", width=180)
                 }
             )
             
