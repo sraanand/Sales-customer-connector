@@ -1284,6 +1284,36 @@ def view_unsold_summary():
                 
                 deals_df = prepare_deals(raw_deals)
                 
+                # Dedupe deals by customer (email/phone combination)
+                deals_df["email_l"] = deals_df["email"].astype(str).str.strip().str.lower()
+                deals_df["user_key"] = (deals_df["phone_norm"].fillna('') + "|" + deals_df["email_l"].fillna('')).str.strip()
+                deals_df = deals_df[deals_df["user_key"].astype(bool)]
+                
+                # Keep first deal per customer and collect all vehicles
+                dedupe_results = []
+                for user_key, group in deals_df.groupby("user_key"):
+                    # Take first deal as primary
+                    primary_deal = group.iloc[0]
+                    
+                    # Collect all vehicles and appointment_ids for this customer
+                    vehicles_info = []
+                    for _, deal_row in group.iterrows():
+                        vehicle_make = deal_row.get('vehicle_make', '')
+                        vehicle_model = deal_row.get('vehicle_model', '')
+                        appointment_id = deal_row.get('appointment_id', '')
+                        vehicle_info = f"{vehicle_make} {vehicle_model}".strip()
+                        if appointment_id:
+                            vehicle_info += f" (ID: {appointment_id})"
+                        vehicles_info.append(vehicle_info)
+                    
+                    # Create combined record
+                    combined_deal = primary_deal.copy()
+                    combined_deal['all_vehicles'] = " | ".join(vehicles_info)
+                    combined_deal['deal_count'] = len(group)
+                    dedupe_results.append(combined_deal)
+                
+                deals_df = pd.DataFrame(dedupe_results)
+                
                 if deals_df.empty:
                     st.info("No deals found after processing.")
                     return
@@ -1326,11 +1356,13 @@ def view_unsold_summary():
                     results.append({
                         "Deal ID": deal_id,
                         "Customer": customer_name,
-                        "Vehicle": vehicle,
+                        "Vehicle": deal_row.get('all_vehicles', vehicle),  # Use combined vehicles
                         "Notes": display_notes,
                         "Summary": analysis.get("summary", "No summary"),
                         "Category": analysis.get("category", "Unknown"),
-                        "Next Steps": analysis.get("next_steps", "No steps")
+                        "Next Steps": analysis.get("next_steps", "No steps"),
+                        "Deal Count": deal_row.get('deal_count', 1),
+                        "TD Date": deal_row.get('conducted_date_local', 'Unknown')  # Add date for weekly breakdown
                     })
                 
                 progress_bar.empty()
@@ -1387,17 +1419,70 @@ def view_unsold_summary():
                 st.write(f"**Full Notes:**")
                 st.text_area("", value=result['Notes'].replace(' | ', '\n'), height=150, key=f"notes_{i}", disabled=True)
         
-        # Category breakdown
+        # Category breakdown with weekly analysis and clickable categories
         if len(results) > 1:
-            st.markdown("#### Category Breakdown")
-            category_counts = results_df["Category"].value_counts()
+            st.markdown("#### Category Breakdown by Week")
             
-            category_df = pd.DataFrame({
-                "Category": category_counts.index,
-                "Count": category_counts.values
-            })
+            # Prepare data for weekly breakdown
+            results_df['TD Date'] = pd.to_datetime([r.get('TD Date', 'Unknown') for r in results], errors='coerce')
+            results_df['Week Starting'] = results_df['TD Date'].dt.to_period('W-MON').dt.start_time.dt.date
             
-            st.dataframe(category_df, use_container_width=True, hide_index=True)
+            # Create weekly breakdown
+            weekly_breakdown = results_df.groupby(['Week Starting', 'Category']).size().unstack(fill_value=0)
+            weekly_breakdown['Total'] = weekly_breakdown.sum(axis=1)
+            
+            # Add total row
+            total_row = weekly_breakdown.sum()
+            total_row.name = 'Total'
+            weekly_breakdown = pd.concat([weekly_breakdown, total_row.to_frame().T])
+            
+            st.dataframe(weekly_breakdown, use_container_width=True)
+            
+            # Clickable category buttons
+            st.markdown("#### Click on a category to see details:")
+            
+            categories = results_df["Category"].value_counts()
+            cols = st.columns(min(len(categories), 4))
+            
+            for i, (category, count) in enumerate(categories.items()):
+                with cols[i % 4]:
+                    if st.button(f"{category} ({count})", key=f"cat_{i}"):
+                        st.session_state["selected_category"] = category
+        
+        # Display selected category details
+        if "selected_category" in st.session_state:
+            selected_cat = st.session_state["selected_category"]
+            st.markdown(f"#### Details for: {selected_cat}")
+            
+            # Filter results for selected category
+            cat_results = [r for r in results if r["Category"] == selected_cat]
+            
+            # Create detailed table
+            detailed_data = []
+            for result in cat_results:
+                detailed_data.append({
+                    "Customer": result["Customer"],
+                    "Vehicles & IDs": result["Vehicle"],
+                    "Notes Summary": result["Summary"],
+                    "Next Steps": result["Next Steps"]
+                })
+            
+            detailed_df = pd.DataFrame(detailed_data)
+            st.dataframe(
+                detailed_df, 
+                use_container_width=True, 
+                hide_index=True,
+                column_config={
+                    "Customer": st.column_config.TextColumn("Customer", width=200),
+                    "Vehicles & IDs": st.column_config.TextColumn("Vehicles & IDs", width=300),
+                    "Notes Summary": st.column_config.TextColumn("Notes Summary", width=400),
+                    "Next Steps": st.column_config.TextColumn("Next Steps", width=200)
+                }
+            )
+            
+            if st.button("Clear Selection", key="clear_cat"):
+                del st.session_state["selected_category"]
+                st.rerun()
 
 # ============ Rendering helpers ============
 def header():
