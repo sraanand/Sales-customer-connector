@@ -90,129 +90,149 @@ PRIMARY = "#4436F5"
 
 st.markdown(f"""
 <style>
-html, body, [data-testid="stAppViewContainer"] {{
-  background: #FFFFFF;
-  color: #000000;
+/* Force light theme and override all potential dark mode conflicts */
+.stApp, .main, .block-container, [data-testid="stAppViewContainer"] {{
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
 }}
-.block-container {{ max-width: 1200px !important; }}
 
-.header-title {{ color: {PRIMARY}; }}
+/* Force all text to be black */
+* {{
+    color: #000000 !important;
+}}
+
+/* Override any dark mode attempts */
+@media (prefers-color-scheme: dark) {{
+    .stApp, .main, .block-container, [data-testid="stAppViewContainer"] {{
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+    }}
+}}
+
+/* Specific overrides for different elements */
+.stMarkdown, .stText, p, h1, h2, h3, h4, h5, h6, span, div {{
+    color: #000000 !important;
+    background-color: transparent !important;
+}}
+
+.block-container {{ 
+    max-width: 1200px !important; 
+    background-color: #FFFFFF !important;
+}}
+
+.header-title {{ color: {PRIMARY} !important; }}
 hr.div {{ border:0;border-top:1px solid #E5E7EB; margin:12px 0 8px }}
 
-div.stButton > button {{
-  background: {PRIMARY} !important;
-  color: #FFFFFF !important;
-  border: 1px solid {PRIMARY} !important;
-  border-radius: 12px;
-  font-weight: 600;
+/* Button styling with better specificity */
+div.stButton > button,
+.stButton > button,
+button[kind="primary"],
+button[kind="secondary"] {{
+    background: {PRIMARY} !important;
+    color: #FFFFFF !important;
+    border: 1px solid {PRIMARY} !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
 }}
-div.stButton > button:hover {{ background: {PRIMARY} !important; }}
-div.stButton > button.cta {{ width:100%; height:100px; font-size:18px; text-align:left; border-radius:16px; }}
 
-.form-row {{ display:flex; justify-content:center; align-items:end; gap:12px; flex-wrap:wrap; }}
-
-input, select, textarea {{
-  background: #FFFFFF !important;
-  color: #000000 !important;
-  border: 1px solid #D1D5DB !important;
-  border-radius: 10px !important;
+div.stButton > button:hover,
+.stButton > button:hover {{
+    background: {PRIMARY} !important;
+    color: #FFFFFF !important;
 }}
-label, .stSelectbox label, .stDateInput label, .stTextInput label {{ color: #000000 !important; }}
 
-/* Enhanced text wrapping for ALL dataframes and tables */
+div.stButton > button.cta {{ 
+    width:100% !important; 
+    height:100px !important; 
+    font-size:18px !important; 
+    text-align:left !important; 
+    border-radius:16px !important;
+}}
+
+.form-row {{ 
+    display:flex !important; 
+    justify-content:center !important; 
+    align-items:end !important; 
+    gap:12px !important; 
+    flex-wrap:wrap !important;
+}}
+
+/* Force form inputs to be white background with black text */
+input, select, textarea,
+.stTextInput input,
+.stSelectbox select,
+.stDateInput input,
+.stTextArea textarea {{
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+    border: 1px solid #D1D5DB !important;
+    border-radius: 10px !important;
+}}
+
+/* Force labels to be black */
+label, 
+.stSelectbox label, 
+.stDateInput label, 
+.stTextInput label,
+.stTextArea label,
+.stRadio label,
+.stCheckbox label {{
+    color: #000000 !important;
+    background-color: transparent !important;
+}}
+
+/* Enhanced table styling with maximum specificity */
+[data-testid="stDataFrame"],
+[data-testid="stDataFrame"] *,
+[data-testid="stTable"],
+[data-testid="stTable"] *,
+[data-testid="stDataEditor"],
+[data-testid="stDataEditor"] * {{
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+}}
+
+/* Force table cells and headers */
 [data-testid="stDataFrame"] div[role="cell"],
 [data-testid="stDataFrame"] div[role="columnheader"],
-[data-testid="stDataFrame"] div[role="gridcell"] {{
-  white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-  word-break: break-word !important;
-  overflow-wrap: anywhere !important;
-  line-height: 1.4 !important;
-  max-width: none !important;
-  height: auto !important;
-  min-height: 40px !important;
-  padding: 8px 12px !important;
-  vertical-align: top !important;
-  overflow: visible !important;
-  text-overflow: unset !important;
+[data-testid="stDataFrame"] div[role="gridcell"],
+[data-testid="stTable"] td,
+[data-testid="stTable"] th,
+[data-testid="stDataEditor"] div[role="cell"],
+[data-testid="stDataEditor"] div[role="columnheader"],
+[data-testid="stDataEditor"] div[role="gridcell"] {{
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+    line-height: 1.4 !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 40px !important;
+    padding: 8px 12px !important;
+    vertical-align: top !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    border: 1px solid #E5E7EB !important;
 }}
 
-[data-testid="stDataFrame"] * {{ 
-  color:#000000 !important; 
-  white-space: pre-wrap !important;
+/* Force table containers */
+[data-testid="stDataFrame"] div[data-testid="stVerticalBlock"],
+[data-testid="stTable"] div[data-testid="stVerticalBlock"],
+[data-testid="stDataEditor"] div[data-testid="stVerticalBlock"] {{
+    background-color: #FFFFFF !important;
 }}
 
-[data-testid="stDataFrame"] div[data-testid="stVerticalBlock"] {{ 
-  background:#FFFFFF !important; 
-}}
-
-[data-testid="stTable"] td, 
-[data-testid="stTable"] th {{ 
-  color:#000000 !important; 
-  white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-  word-break: break-word !important;
-  overflow-wrap: anywhere !important;
-  line-height: 1.4 !important;
-  padding: 8px 12px !important;
-  vertical-align: top !important;
-  max-width: 300px !important;
-  height: auto !important;
-}}
-
-/* Enhanced text wrapping for data editor */
-[data-testid="stDataEditor"] div[role="gridcell"],
-[data-testid="stDataEditor"] div[role="columnheader"] {{
-  white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-  word-break: break-word !important;
-  overflow-wrap: anywhere !important;
-  line-height: 1.4 !important;
-  max-width: none !important;
-  height: auto !important;
-  min-height: 60px !important;
-  padding: 8px 12px !important;
-  vertical-align: top !important;
-  overflow: visible !important;
-  text-overflow: unset !important;
-}}
-
-/* Special handling for SMS draft column in data editor */
-[data-testid="stDataEditor"] div[role="gridcell"]:nth-child(4) {{
-  white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-  overflow: visible !important;
-  text-overflow: unset !important;
-  min-height: 80px !important;
-  padding: 8px 12px !important;
-  max-width: 400px !important;
-}}
-
-[data-testid="stDataEditor"] div[role="row"] {{
-  align-items: stretch !important;
-  height: auto !important;
-  min-height: 60px !important;
-}}
-
-[data-testid="stDataEditor"] div[role="grid"] {{
-  overflow: visible !important;
-}}
-
-/* Ensure table containers allow proper height */
-[data-testid="stDataFrame"],
-[data-testid="stTable"],
-[data-testid="stDataEditor"] {{
-  height: auto !important;
-  min-height: auto !important;
-  overflow: visible !important;
-}}
-
-/* Force word wrapping on any table-like structure */
+/* Override any remaining dark elements */
 .stDataFrame table,
 .stTable table,
 .stDataEditor table {{
-  table-layout: auto !important;
-  width: 100% !important;
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+    table-layout: auto !important;
+    width: 100% !important;
 }}
 
 .stDataFrame td,
@@ -221,42 +241,47 @@ label, .stSelectbox label, .stDateInput label, .stTextInput label {{ color: #000
 .stTable th,
 .stDataEditor td,
 .stDataEditor th {{
-  white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-  word-break: break-word !important;
-  overflow-wrap: anywhere !important;
-  line-height: 1.4 !important;
-  padding: 8px 12px !important;
-  vertical-align: top !important;
-  max-width: 300px !important;
-  height: auto !important;
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+    line-height: 1.4 !important;
+    padding: 8px 12px !important;
+    vertical-align: top !important;
+    max-width: 300px !important;
+    height: auto !important;
+    border: 1px solid #E5E7EB !important;
 }}
 
-/* Preview table legacy (enhanced wrapping) */
-.preview-table table {{
-  background: #FFFFFF !important; 
-  color: #000000 !important; 
-  border-collapse: collapse !important; 
-  width: 100%;
-  table-layout: auto !important;
+/* Sidebar forcing */
+.css-1d391kg, .css-1lcbmhc, .css-1outpf7, .sidebar {{
+    background-color: #F8F9FA !important;
+    color: #000000 !important;
 }}
 
-.preview-table th, 
-.preview-table td {{
-  border: 1px solid #000000 !important; 
-  padding: 8px 12px !important; 
-  vertical-align: top !important;
-  white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-  word-break: break-word !important;
-  overflow-wrap: anywhere !important;
-  line-height: 1.4 !important;
-  max-width: 300px !important;
-  height: auto !important;
+/* Info/warning/error boxes */
+.stAlert, .stSuccess, .stInfo, .stWarning, .stError {{
+    background-color: #F8F9FA !important;
+    color: #000000 !important;
+    border: 1px solid #E5E7EB !important;
 }}
 
-.preview-table th {{ 
-  font-weight: 700 !important; 
+/* Expander */
+.streamlit-expanderHeader, .streamlit-expanderContent {{
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+}}
+
+/* Progress bars */
+.stProgress > div > div {{
+    background-color: {PRIMARY} !important;
+}}
+
+/* Spinner */
+.stSpinner > div {{
+    border-top-color: {PRIMARY} !important;
 }}
 </style>
 """, unsafe_allow_html=True)
