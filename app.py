@@ -1034,9 +1034,14 @@ def hs_batch_read_deals(deal_ids: list[str], props: list[str]) -> dict[str, dict
     return out
 
 # ============ Aircall ============
-def send_sms_via_aircall(phone: str, message: str) -> tuple[bool, str]:
+def send_sms_via_aircall(phone: str, message: str, number_id: str = None) -> tuple[bool, str]:
+    """Send SMS with specified Aircall number ID"""
+    # Use default number if none specified
+    if number_id is None:
+        number_id = AIRCALL_NUMBER_ID
+    
     try:
-        url = f"{AIRCALL_BASE_URL}/numbers/{AIRCALL_NUMBER_ID}/messages/native/send"
+        url = f"{AIRCALL_BASE_URL}/numbers/{number_id}/messages/native/send"
         resp = requests.post(url, json={"to": phone, "body": message}, auth=(AIRCALL_ID, AIRCALL_TOKEN), timeout=12)
         resp.raise_for_status()
         return True, "sent"
@@ -1703,7 +1708,7 @@ def view_reminders():
                 st.info("Sending messages…")
                 sent, failed = 0, 0
                 for _, r in to_send.iterrows():
-                    ok, msg = send_sms_via_aircall(r["Phone"], r["SMS draft"])
+                    ok, msg = send_sms_via_aircall(r["Phone"], r["SMS draft"], AIRCALL_NUMBER_ID)
                     if ok: sent += 1; st.success(f"✅ Sent to {r['Phone']}")
                     else:  failed += 1; st.error(f"❌ Failed for {r['Phone']}: {msg}")
                     time.sleep(1)
@@ -1840,7 +1845,7 @@ def view_manager():
                 st.info("Sending messages…")
                 sent, failed = 0, 0
                 for _, r in to_send.iterrows():
-                    ok, msg = send_sms_via_aircall(r["Phone"], r["SMS draft"])
+                    ok, msg = send_sms_via_aircall(r["Phone"], r["SMS draft"], AIRCALL_NUMBER_ID_2)
                     if ok: sent += 1; st.success(f"✅ Sent to {r['Phone']}")
                     else:  failed += 1; st.error(f"❌ Failed for {r['Phone']}: {msg}")
                     time.sleep(1)
@@ -1968,7 +1973,7 @@ def view_old():
                 st.info("Sending messages…")
                 sent, failed = 0, 0
                 for _, r in to_send.iterrows():
-                    ok, msg = send_sms_via_aircall(r["Phone"], r["SMS draft"])
+                    ok, msg = send_sms_via_aircall(r["Phone"], r["SMS draft"], AIRCALL_NUMBER_ID_2)
                     if ok: sent += 1; st.success(f"✅ Sent to {r['Phone']}")
                     else:  failed += 1; st.error(f"❌ Failed for {r['Phone']}: {msg}")
                     time.sleep(1)
