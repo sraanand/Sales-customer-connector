@@ -23,7 +23,7 @@ AIRCALL_NUMBER_ID = os.getenv("AIRCALL_NUMBER_ID")
 OPENAI_API_KEY    = os.getenv("OPENAI_API_KEY")
 
 # Deployment timestamp
-DEPLOYMENT_TIME = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+DEPLOYMENT_TIME = datetime.now(MEL_TZ).strftime("%Y-%m-%d %H:%M:%S AEST")
 
 # OpenAI client (support both new & legacy SDKs)
 _openai_ok = False
@@ -1599,7 +1599,7 @@ def header():
         # Try to load the logo, fallback to text if it fails
         try:
             if os.path.exists(logo_path):
-                st.image(logo_path, width=100, use_container_width=False)
+                st.image(logo_path, width=200, height= 50, use_container_width=False)
             else:
                 # Fallback to text logo
                 st.markdown(
