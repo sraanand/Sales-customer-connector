@@ -94,142 +94,255 @@ PRIMARY = "#4436F5"
 
 st.markdown(f"""
 <style>
+/* ================================= */
+/* GLOBAL PAGE STYLING */
+/* ================================= */
+
+/* Force the entire app container to have white background */
 html, body, [data-testid="stAppViewContainer"] {{
-  background: #FFFFFF;
-  color: #000000;
+  background-color: #FFFFFF !important;  /* White background for entire page */
+  color: #000000 !important;             /* Black text for entire page */
 }}
-.block-container {{ max-width: 1200px !important; }}
 
+/* Set maximum width for the main content area */
+.block-container {{ 
+  max-width: 1200px !important;          /* Limit content width to 1200px */
+}}
+
+/* ================================= */
+/* HEADER STYLING */
+/* ================================= */
+
+/* Center the main page title */
 .header-title {{ 
-    color: {PRIMARY}; 
-    text-align: center !important;
-    margin: 0 !important;
+    color: {PRIMARY} !important;         /* Use primary blue color for title */
+    text-align: center !important;       /* Center the title horizontally */
+    margin: 0 !important;                /* Remove default margins */
 }}
 
-hr.div {{ border:0;border-top:1px solid #E5E7EB; margin:12px 0 8px }}
+/* Style the horizontal divider line */
+hr.div {{ 
+  border: 0;                           /* Remove default border */
+  border-top: 1px solid #E5E7EB;      /* Add thin gray top border */
+  margin: 12px 0 8px;                  /* Add spacing above and below */
+}}
 
+/* ================================= */
+/* BUTTON STYLING */
+/* ================================= */
+
+/* Style all Streamlit buttons */
 div.stButton > button {{
-    background: {PRIMARY} !important;
-    color: #FFFFFF !important;
-    border: 1px solid {PRIMARY} !important;
-    border-radius: 12px;
-    font-weight: 600;
+    background-color: {PRIMARY} !important;  /* Blue background */
+    color: #FFFFFF !important;               /* WHITE text on buttons */
+    border: 1px solid {PRIMARY} !important;  /* Blue border */
+    border-radius: 12px !important;          /* Rounded corners */
+    font-weight: 600 !important;             /* Bold text */
 }}
+
+/* Button hover effects */
 div.stButton > button:hover {{ 
-    background: {PRIMARY} !important; 
-    color: #FFFFFF !important;
+    background-color: {PRIMARY} !important;  /* Keep blue on hover */
+    color: #FFFFFF !important;               /* Keep WHITE text on hover */
 }}
+
+/* Special styling for call-to-action buttons */
 div.stButton > button.cta {{ 
-    width:100%; 
-    height:100px; 
-    font-size:18px; 
-    text-align:left; 
-    border-radius:16px;
-    color: #FFFFFF !important;
+    width: 100% !important;                  /* Full width */
+    height: 100px !important;                /* Taller height */
+    font-size: 18px !important;              /* Larger text */
+    text-align: left !important;             /* Left-align text */
+    border-radius: 16px !important;          /* More rounded corners */
+    color: #FFFFFF !important;               /* Ensure WHITE text */
 }}
 
-.form-row {{ display:flex; justify-content:center; align-items:end; gap:12px; flex-wrap:wrap; }}
+/* ================================= */
+/* FORM STYLING */
+/* ================================= */
 
+/* Layout for form elements in a row */
+.form-row {{ 
+  display: flex !important;            /* Use flexbox layout */
+  justify-content: center !important;  /* Center horizontally */
+  align-items: end !important;         /* Align to bottom */
+  gap: 12px !important;                /* Space between elements */
+  flex-wrap: wrap !important;          /* Wrap on small screens */
+}}
+
+/* Style all form inputs */
 input, select, textarea {{
-  background: #FFFFFF !important;
-  color: #000000 !important;
-  border: 1px solid #D1D5DB !important;
-  border-radius: 10px !important;
+  background-color: #FFFFFF !important;  /* White background for inputs */
+  color: #000000 !important;             /* Black text in inputs */
+  border: 1px solid #D1D5DB !important;  /* Gray border */
+  border-radius: 10px !important;        /* Rounded corners */
 }}
-label, .stSelectbox label, .stDateInput label, .stTextInput label {{ color: #000000 !important; }}
 
-/* CRITICAL: Force table text to be BLACK with maximum specificity */
+/* Style all form labels */
+label, .stSelectbox label, .stDateInput label, .stTextInput label {{ 
+  color: #000000 !important;           /* Black text for labels */
+}}
+
+/* ================================= */
+/* TABLE STYLING - AGGRESSIVE APPROACH */
+/* ================================= */
+
+/* ATTEMPT 1: Target main dataframe container */
 [data-testid="stDataFrame"] {{
-    background-color: #FFFFFF !important;
+    background-color: #FFFFFF !important;  /* Force white background */
+    color: #000000 !important;             /* Force black text */
 }}
 
+/* ATTEMPT 2: Target ALL children of dataframe */
 [data-testid="stDataFrame"] * {{
-    color: #000000 !important;
-    background-color: #FFFFFF !important;
+    color: #000000 !important;             /* Force ALL child elements to black text */
+    background-color: transparent !important; /* Transparent background for children */
 }}
 
-[data-testid="stDataFrame"] div,
-[data-testid="stDataFrame"] span,
-[data-testid="stDataFrame"] p,
-[data-testid="stDataFrame"] td,
-[data-testid="stDataFrame"] th {{
-    color: #000000 !important;
-    background-color: #FFFFFF !important;
+/* ATTEMPT 3: Target specific table cell types */
+[data-testid="stDataFrame"] div[role="cell"] {{
+  background-color: #FFFFFF !important;    /* White background for cells */
+  color: #000000 !important;               /* BLACK text for cells */
+  border: 1px solid #CCCCCC !important;    /* Gray border to see cell boundaries */
+  padding: 8px !important;                 /* Padding inside cells */
 }}
 
+/* ATTEMPT 4: Target column headers specifically */
+[data-testid="stDataFrame"] div[role="columnheader"] {{
+  background-color: #F8F9FA !important;    /* Light gray background for headers */
+  color: #000000 !important;               /* BLACK text for headers */
+  font-weight: bold !important;            /* Bold header text */
+  border: 1px solid #CCCCCC !important;    /* Gray border */
+  padding: 8px !important;                 /* Padding inside headers */
+}}
+
+/* ATTEMPT 5: Target grid cells */
+[data-testid="stDataFrame"] div[role="gridcell"] {{
+  background-color: #FFFFFF !important;    /* White background */
+  color: #000000 !important;               /* BLACK text */
+  border: 1px solid #CCCCCC !important;    /* Gray border */
+  padding: 8px !important;                 /* Padding */
+}}
+
+/* ATTEMPT 6: Target any div inside table cells */
+[data-testid="stDataFrame"] div[role="cell"] div {{
+    color: #000000 !important;             /* Force black text on cell divs */
+}}
+
+[data-testid="stDataFrame"] div[role="columnheader"] div {{
+    color: #000000 !important;             /* Force black text on header divs */
+}}
+
+[data-testid="stDataFrame"] div[role="gridcell"] div {{
+    color: #000000 !important;             /* Force black text on gridcell divs */
+}}
+
+/* ATTEMPT 7: Target spans inside cells */
+[data-testid="stDataFrame"] span {{
+    color: #000000 !important;             /* Force black text on spans */
+}}
+
+/* ATTEMPT 8: Alternative dataframe selectors */
+.stDataFrame {{
+    color: #000000 !important;             /* Black text for stDataFrame class */
+}}
+
+.stDataFrame * {{
+    color: #000000 !important;             /* Black text for all children */
+}}
+
+/* ATTEMPT 9: Use CSS pseudo-selectors */
+[data-testid="stDataFrame"] *:not(button):not(input) {{
+    color: #000000 !important;             /* Black text except buttons and inputs */
+}}
+
+/* ATTEMPT 10: Nuclear option - override any text color */
+div[data-testid="stDataFrame"] {{
+    color: #000000 !important;
+}}
+
+div[data-testid="stDataFrame"] > * {{
+    color: #000000 !important;
+}}
+
+div[data-testid="stDataFrame"] > * > * {{
+    color: #000000 !important;
+}}
+
+div[data-testid="stDataFrame"] > * > * > * {{
+    color: #000000 !important;
+}}
+
+/* ================================= */
+/* ALTERNATIVE TABLE STYLING */
+/* ================================= */
+
+/* Style regular HTML tables if Streamlit falls back to them */
+table {{
+    background-color: #FFFFFF !important;  /* White table background */
+    color: #000000 !important;             /* Black table text */
+    border-collapse: collapse !important;   /* Merge borders */
+}}
+
+table td, table th {{
+    background-color: #FFFFFF !important;  /* White cell background */
+    color: #000000 !important;             /* BLACK cell text */
+    border: 1px solid #CCCCCC !important;  /* Gray cell borders */
+    padding: 8px !important;               /* Cell padding */
+}}
+
+/* ================================= */
+/* TEXT WRAPPING */
+/* ================================= */
+
+/* Ensure text wraps properly in all table cells */
 [data-testid="stDataFrame"] div[role="cell"],
 [data-testid="stDataFrame"] div[role="columnheader"],
 [data-testid="stDataFrame"] div[role="gridcell"] {{
-  background-color: #FFFFFF !important;
-  color: #000000 !important;
-  white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-  line-height: 1.4 !important;
-  padding: 8px 12px !important;
-  vertical-align: top !important;
-  border: 1px solid #E5E7EB !important;
-}}
-
-/* Force ALL table elements to have black text */
-[data-testid="stDataFrame"] div[role="cell"] *,
-[data-testid="stDataFrame"] div[role="columnheader"] *,
-[data-testid="stDataFrame"] div[role="gridcell"] * {{
-    color: #000000 !important;
-    background-color: transparent !important;
-}}
-
-[data-testid="stTable"] {{
-    background-color: #FFFFFF !important;
-}}
-
-[data-testid="stTable"] * {{
-    color: #000000 !important;
-    background-color: #FFFFFF !important;
-}}
-
-[data-testid="stTable"] td, 
-[data-testid="stTable"] th {{ 
-  background-color: #FFFFFF !important;
-  color: #000000 !important; 
-  white-space: pre-wrap !important;
-  padding: 8px 12px !important;
-  border: 1px solid #E5E7EB !important;
-}}
-
-[data-testid="stDataEditor"] {{
-    background-color: #FFFFFF !important;
-}}
-
-[data-testid="stDataEditor"] * {{
-    color: #000000 !important;
-    background-color: #FFFFFF !important;
-}}
-
-[data-testid="stDataEditor"] div[role="gridcell"],
-[data-testid="stDataEditor"] div[role="columnheader"] {{
-  background-color: #FFFFFF !important;
-  color: #000000 !important;
-  white-space: pre-wrap !important;
-  padding: 8px 12px !important;
-  border: 1px solid #E5E7EB !important;
-}}
-
-/* Override any Streamlit theme that might set text to white */
-.stDataFrame, .stTable, .stDataEditor {{
-    color: #000000 !important;
-}}
-
-.stDataFrame *, .stTable *, .stDataEditor * {{
-    color: #000000 !important;
-}}
-
-/* Additional override for table content */
-table, tbody, tr, td, th {{
-    color: #000000 !important;
-    background-color: #FFFFFF !important;
+  white-space: pre-wrap !important;        /* Preserve line breaks and wrap */
+  word-wrap: break-word !important;        /* Break long words */
+  overflow-wrap: anywhere !important;      /* Allow breaking anywhere */
+  line-height: 1.4 !important;             /* Readable line spacing */
+  max-width: none !important;              /* No width restrictions */
+  height: auto !important;                 /* Auto height */
+  min-height: 40px !important;             /* Minimum cell height */
+  vertical-align: top !important;          /* Align content to top */
+  overflow: visible !important;            /* Show all content */
 }}
 </style>
+
+<script>
+/* ================================= */
+/* JAVASCRIPT BACKUP APPROACH */
+/* ================================= */
+
+/* If CSS fails, use JavaScript to force black text */
+setTimeout(function() {{
+    /* Find all dataframe elements */
+    var dataframes = document.querySelectorAll('[data-testid="stDataFrame"]');
+    
+    /* Loop through each dataframe */
+    dataframes.forEach(function(df) {{
+        /* Set black text on the container */
+        df.style.color = '#000000';
+        df.style.backgroundColor = '#FFFFFF';
+        
+        /* Find all child elements and force black text */
+        var allChildren = df.querySelectorAll('*');
+        allChildren.forEach(function(child) {{
+            child.style.color = '#000000';
+            /* Don't override button backgrounds */
+            if (!child.matches('button')) {{
+                child.style.backgroundColor = 'transparent';
+            }}
+        }});
+    }});
+    
+    /* Log to console for debugging */
+    console.log('Applied black text to', dataframes.length, 'dataframes');
+}}, 1000); /* Wait 1 second for page to load */
+</script>
 """, unsafe_allow_html=True)
+
 
 # ============ Helpers ============
 def hs_headers() -> dict:
