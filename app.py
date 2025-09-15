@@ -1589,15 +1589,59 @@ def view_unsold_summary():
 def header():
     cols = st.columns([1, 6, 1.2])
     with cols[0]:
-        # Try to load H2.svg logo
-        try:
-            st.image("H2.svg", width=100, use_container_width=False)
-        except:
-            # Fallback if H2.svg not found
+        # Enhanced SVG loading with debugging
+        import os
+        
+        # Check if file exists
+        if os.path.exists("H2.svg"):
+            try:
+                # Method 1: Try direct st.image
+                st.image("H2.svg", width=100, use_container_width=False)
+            except Exception as e:
+                try:
+                    # Method 2: Try reading and displaying SVG content directly
+                    with open("H2.svg", "r", encoding="utf-8") as f:
+                        svg_content = f.read()
+                    
+                    # Display SVG as HTML
+                    st.markdown(
+                        f'<div style="width:100px;height:40px;display:flex;align-items:center;">{svg_content}</div>',
+                        unsafe_allow_html=True
+                    )
+                except Exception as e2:
+                    try:
+                        # Method 3: Try reading as binary
+                        with open("H2.svg", "rb") as f:
+                            svg_bytes = f.read()
+                        st.image(svg_bytes, width=100, use_container_width=False)
+                    except Exception as e3:
+                        # Method 4: Show debug info and fallback
+                        st.write(f"SVG Debug - File exists but failed to load:")
+                        st.write(f"Method 1 error: {str(e)[:50]}")
+                        st.write(f"Method 2 error: {str(e2)[:50]}")
+                        st.write(f"Method 3 error: {str(e3)[:50]}")
+                        
+                        # Fallback
+                        st.markdown(
+                            f"<div style='height:40px;display:flex;align-items:center;'><div style='background:{PRIMARY};padding:6px 10px;border-radius:6px;'><span style='font-weight:800;color:#FFFFFF'>CARS24</span></div></div>",
+                            unsafe_allow_html=True
+                        )
+        else:
+            # File doesn't exist - show current directory contents for debugging
+            current_files = os.listdir(".")
+            svg_files = [f for f in current_files if f.endswith('.svg')]
+            
+            st.write("Debug: H2.svg not found")
+            st.write(f"Current directory: {os.getcwd()}")
+            st.write(f"SVG files found: {svg_files}")
+            st.write(f"All files: {current_files[:10]}...")  # Show first 10 files
+            
+            # Fallback
             st.markdown(
                 f"<div style='height:40px;display:flex;align-items:center;'><div style='background:{PRIMARY};padding:6px 10px;border-radius:6px;'><span style='font-weight:800;color:#FFFFFF'>CARS24</span></div></div>",
                 unsafe_allow_html=True
             )
+                
     with cols[1]:
         st.markdown('<h1 class="header-title" style="margin:0;">Pawan Customer Connector</h1>', unsafe_allow_html=True)
     with cols[2]:
