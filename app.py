@@ -1594,7 +1594,7 @@ def header():
         
         # Get the directory where app.py is located
         app_dir = os.path.dirname(os.path.abspath(__file__))
-        logo_path = os.path.join(app_dir, "H2.svg")
+        logo_path = os.path.join(app_dir, "Old_Cars24_logo.svg")
         
         # Try to load the logo, fallback to text if it fails
         try:
