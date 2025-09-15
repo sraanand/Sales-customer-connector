@@ -100,7 +100,6 @@ html, body, [data-testid="stAppViewContainer"] {{
 }}
 .block-container {{ max-width: 1200px !important; }}
 
-/* Center the header title */
 .header-title {{ 
     color: {PRIMARY}; 
     text-align: center !important;
@@ -109,7 +108,6 @@ html, body, [data-testid="stAppViewContainer"] {{
 
 hr.div {{ border:0;border-top:1px solid #E5E7EB; margin:12px 0 8px }}
 
-/* Button styling - WHITE text on blue background */
 div.stButton > button {{
     background: {PRIMARY} !important;
     color: #FFFFFF !important;
@@ -140,7 +138,25 @@ input, select, textarea {{
 }}
 label, .stSelectbox label, .stDateInput label, .stTextInput label {{ color: #000000 !important; }}
 
-/* Table styling - BLACK text on WHITE background */
+/* CRITICAL: Force table text to be BLACK with maximum specificity */
+[data-testid="stDataFrame"] {{
+    background-color: #FFFFFF !important;
+}}
+
+[data-testid="stDataFrame"] * {{
+    color: #000000 !important;
+    background-color: #FFFFFF !important;
+}}
+
+[data-testid="stDataFrame"] div,
+[data-testid="stDataFrame"] span,
+[data-testid="stDataFrame"] p,
+[data-testid="stDataFrame"] td,
+[data-testid="stDataFrame"] th {{
+    color: #000000 !important;
+    background-color: #FFFFFF !important;
+}}
+
 [data-testid="stDataFrame"] div[role="cell"],
 [data-testid="stDataFrame"] div[role="columnheader"],
 [data-testid="stDataFrame"] div[role="gridcell"] {{
@@ -148,25 +164,27 @@ label, .stSelectbox label, .stDateInput label, .stTextInput label {{ color: #000
   color: #000000 !important;
   white-space: pre-wrap !important;
   word-wrap: break-word !important;
-  word-break: break-word !important;
-  overflow-wrap: anywhere !important;
   line-height: 1.4 !important;
-  max-width: none !important;
-  height: auto !important;
-  min-height: 40px !important;
   padding: 8px 12px !important;
   vertical-align: top !important;
-  overflow: visible !important;
-  text-overflow: unset !important;
+  border: 1px solid #E5E7EB !important;
 }}
 
-[data-testid="stDataFrame"] * {{ 
-  background-color: #FFFFFF !important;
-  color: #000000 !important;
+/* Force ALL table elements to have black text */
+[data-testid="stDataFrame"] div[role="cell"] *,
+[data-testid="stDataFrame"] div[role="columnheader"] *,
+[data-testid="stDataFrame"] div[role="gridcell"] * {{
+    color: #000000 !important;
+    background-color: transparent !important;
 }}
 
-[data-testid="stDataFrame"] div[data-testid="stVerticalBlock"] {{ 
-  background: #FFFFFF !important; 
+[data-testid="stTable"] {{
+    background-color: #FFFFFF !important;
+}}
+
+[data-testid="stTable"] * {{
+    color: #000000 !important;
+    background-color: #FFFFFF !important;
 }}
 
 [data-testid="stTable"] td, 
@@ -174,118 +192,41 @@ label, .stSelectbox label, .stDateInput label, .stTextInput label {{ color: #000
   background-color: #FFFFFF !important;
   color: #000000 !important; 
   white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-  word-break: break-word !important;
-  overflow-wrap: anywhere !important;
-  line-height: 1.4 !important;
   padding: 8px 12px !important;
-  vertical-align: top !important;
-  max-width: 300px !important;
-  height: auto !important;
+  border: 1px solid #E5E7EB !important;
 }}
 
-/* Data editor styling */
+[data-testid="stDataEditor"] {{
+    background-color: #FFFFFF !important;
+}}
+
+[data-testid="stDataEditor"] * {{
+    color: #000000 !important;
+    background-color: #FFFFFF !important;
+}}
+
 [data-testid="stDataEditor"] div[role="gridcell"],
 [data-testid="stDataEditor"] div[role="columnheader"] {{
   background-color: #FFFFFF !important;
   color: #000000 !important;
   white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-  word-break: break-word !important;
-  overflow-wrap: anywhere !important;
-  line-height: 1.4 !important;
-  max-width: none !important;
-  height: auto !important;
-  min-height: 60px !important;
   padding: 8px 12px !important;
-  vertical-align: top !important;
-  overflow: visible !important;
-  text-overflow: unset !important;
+  border: 1px solid #E5E7EB !important;
 }}
 
-[data-testid="stDataEditor"] div[role="gridcell"]:nth-child(4) {{
-  white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-  overflow: visible !important;
-  text-overflow: unset !important;
-  min-height: 80px !important;
-  padding: 8px 12px !important;
-  max-width: 400px !important;
+/* Override any Streamlit theme that might set text to white */
+.stDataFrame, .stTable, .stDataEditor {{
+    color: #000000 !important;
 }}
 
-[data-testid="stDataEditor"] div[role="row"] {{
-  align-items: stretch !important;
-  height: auto !important;
-  min-height: 60px !important;
+.stDataFrame *, .stTable *, .stDataEditor * {{
+    color: #000000 !important;
 }}
 
-[data-testid="stDataEditor"] div[role="grid"] {{
-  overflow: visible !important;
-}}
-
-/* Ensure table containers allow proper height */
-[data-testid="stDataFrame"],
-[data-testid="stTable"],
-[data-testid="stDataEditor"] {{
-  height: auto !important;
-  min-height: auto !important;
-  overflow: visible !important;
-}}
-
-/* Force word wrapping on any table-like structure */
-.stDataFrame table,
-.stTable table,
-.stDataEditor table {{
-  table-layout: auto !important;
-  width: 100% !important;
-}}
-
-.stDataFrame td,
-.stDataFrame th,
-.stTable td,
-.stTable th,
-.stDataEditor td,
-.stDataEditor th {{
-  background-color: #FFFFFF !important;
-  color: #000000 !important;
-  white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-  word-break: break-word !important;
-  overflow-wrap: anywhere !important;
-  line-height: 1.4 !important;
-  padding: 8px 12px !important;
-  vertical-align: top !important;
-  max-width: 300px !important;
-  height: auto !important;
-}}
-
-/* Preview table legacy */
-.preview-table table {{
-  background: #FFFFFF !important; 
-  color: #000000 !important; 
-  border-collapse: collapse !important; 
-  width: 100%;
-  table-layout: auto !important;
-}}
-
-.preview-table th, 
-.preview-table td {{
-  border: 1px solid #000000 !important; 
-  padding: 8px 12px !important; 
-  vertical-align: top !important;
-  white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-  word-break: break-word !important;
-  overflow-wrap: anywhere !important;
-  line-height: 1.4 !important;
-  max-width: 300px !important;
-  height: auto !important;
-  background-color: #FFFFFF !important;
-  color: #000000 !important;
-}}
-
-.preview-table th {{ 
-  font-weight: 700 !important; 
+/* Additional override for table content */
+table, tbody, tr, td, th {{
+    color: #000000 !important;
+    background-color: #FFFFFF !important;
 }}
 </style>
 """, unsafe_allow_html=True)
