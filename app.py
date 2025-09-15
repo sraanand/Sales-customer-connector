@@ -85,154 +85,159 @@ STAGE_LABELS = {
 }
 
 # ============ UI Theme ============
-st.set_page_config(page_title="Pawan Customer Connector", layout="wide")
+st.set_page_config(
+    page_title="Pawan Customer Connector", 
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 PRIMARY = "#4436F5"
 
 st.markdown(f"""
 <style>
-/* Force light theme and override all potential dark mode conflicts */
-.stApp, .main, .block-container, [data-testid="stAppViewContainer"] {{
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
+html, body, [data-testid="stAppViewContainer"] {{
+  background: #FFFFFF;
+  color: #000000;
+}}
+.block-container {{ max-width: 1200px !important; }}
+
+/* Center the header title */
+.header-title {{ 
+    color: {PRIMARY}; 
+    text-align: center !important;
+    margin: 0 !important;
 }}
 
-/* Force all text to be black */
-* {{
-    color: #000000 !important;
-}}
-
-/* Override any dark mode attempts */
-@media (prefers-color-scheme: dark) {{
-    .stApp, .main, .block-container, [data-testid="stAppViewContainer"] {{
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
-    }}
-}}
-
-/* Specific overrides for different elements */
-.stMarkdown, .stText, p, h1, h2, h3, h4, h5, h6, span, div {{
-    color: #000000 !important;
-    background-color: transparent !important;
-}}
-
-.block-container {{ 
-    max-width: 1200px !important; 
-    background-color: #FFFFFF !important;
-}}
-
-.header-title {{ color: {PRIMARY} !important; }}
 hr.div {{ border:0;border-top:1px solid #E5E7EB; margin:12px 0 8px }}
 
-/* Button styling with better specificity */
-div.stButton > button,
-.stButton > button,
-button[kind="primary"],
-button[kind="secondary"] {{
+/* Button styling - WHITE text on blue background */
+div.stButton > button {{
     background: {PRIMARY} !important;
     color: #FFFFFF !important;
     border: 1px solid {PRIMARY} !important;
-    border-radius: 12px !important;
-    font-weight: 600 !important;
+    border-radius: 12px;
+    font-weight: 600;
 }}
-
-div.stButton > button:hover,
-.stButton > button:hover {{
-    background: {PRIMARY} !important;
+div.stButton > button:hover {{ 
+    background: {PRIMARY} !important; 
+    color: #FFFFFF !important;
+}}
+div.stButton > button.cta {{ 
+    width:100%; 
+    height:100px; 
+    font-size:18px; 
+    text-align:left; 
+    border-radius:16px;
     color: #FFFFFF !important;
 }}
 
-div.stButton > button.cta {{ 
-    width:100% !important; 
-    height:100px !important; 
-    font-size:18px !important; 
-    text-align:left !important; 
-    border-radius:16px !important;
-}}
+.form-row {{ display:flex; justify-content:center; align-items:end; gap:12px; flex-wrap:wrap; }}
 
-.form-row {{ 
-    display:flex !important; 
-    justify-content:center !important; 
-    align-items:end !important; 
-    gap:12px !important; 
-    flex-wrap:wrap !important;
+input, select, textarea {{
+  background: #FFFFFF !important;
+  color: #000000 !important;
+  border: 1px solid #D1D5DB !important;
+  border-radius: 10px !important;
 }}
+label, .stSelectbox label, .stDateInput label, .stTextInput label {{ color: #000000 !important; }}
 
-/* Force form inputs to be white background with black text */
-input, select, textarea,
-.stTextInput input,
-.stSelectbox select,
-.stDateInput input,
-.stTextArea textarea {{
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
-    border: 1px solid #D1D5DB !important;
-    border-radius: 10px !important;
-}}
-
-/* Force labels to be black */
-label, 
-.stSelectbox label, 
-.stDateInput label, 
-.stTextInput label,
-.stTextArea label,
-.stRadio label,
-.stCheckbox label {{
-    color: #000000 !important;
-    background-color: transparent !important;
-}}
-
-/* Enhanced table styling with maximum specificity */
-[data-testid="stDataFrame"],
-[data-testid="stDataFrame"] *,
-[data-testid="stTable"],
-[data-testid="stTable"] *,
-[data-testid="stDataEditor"],
-[data-testid="stDataEditor"] * {{
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
-}}
-
-/* Force table cells and headers */
+/* Table styling - BLACK text on WHITE background */
 [data-testid="stDataFrame"] div[role="cell"],
 [data-testid="stDataFrame"] div[role="columnheader"],
-[data-testid="stDataFrame"] div[role="gridcell"],
-[data-testid="stTable"] td,
-[data-testid="stTable"] th,
-[data-testid="stDataEditor"] div[role="cell"],
-[data-testid="stDataEditor"] div[role="columnheader"],
-[data-testid="stDataEditor"] div[role="gridcell"] {{
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
-    white-space: pre-wrap !important;
-    word-wrap: break-word !important;
-    word-break: break-word !important;
-    overflow-wrap: anywhere !important;
-    line-height: 1.4 !important;
-    max-width: none !important;
-    height: auto !important;
-    min-height: 40px !important;
-    padding: 8px 12px !important;
-    vertical-align: top !important;
-    overflow: visible !important;
-    text-overflow: unset !important;
-    border: 1px solid #E5E7EB !important;
+[data-testid="stDataFrame"] div[role="gridcell"] {{
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.4 !important;
+  max-width: none !important;
+  height: auto !important;
+  min-height: 40px !important;
+  padding: 8px 12px !important;
+  vertical-align: top !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
 }}
 
-/* Force table containers */
-[data-testid="stDataFrame"] div[data-testid="stVerticalBlock"],
-[data-testid="stTable"] div[data-testid="stVerticalBlock"],
-[data-testid="stDataEditor"] div[data-testid="stVerticalBlock"] {{
-    background-color: #FFFFFF !important;
+[data-testid="stDataFrame"] * {{ 
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
 }}
 
-/* Override any remaining dark elements */
+[data-testid="stDataFrame"] div[data-testid="stVerticalBlock"] {{ 
+  background: #FFFFFF !important; 
+}}
+
+[data-testid="stTable"] td, 
+[data-testid="stTable"] th {{ 
+  background-color: #FFFFFF !important;
+  color: #000000 !important; 
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.4 !important;
+  padding: 8px 12px !important;
+  vertical-align: top !important;
+  max-width: 300px !important;
+  height: auto !important;
+}}
+
+/* Data editor styling */
+[data-testid="stDataEditor"] div[role="gridcell"],
+[data-testid="stDataEditor"] div[role="columnheader"] {{
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.4 !important;
+  max-width: none !important;
+  height: auto !important;
+  min-height: 60px !important;
+  padding: 8px 12px !important;
+  vertical-align: top !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+}}
+
+[data-testid="stDataEditor"] div[role="gridcell"]:nth-child(4) {{
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  min-height: 80px !important;
+  padding: 8px 12px !important;
+  max-width: 400px !important;
+}}
+
+[data-testid="stDataEditor"] div[role="row"] {{
+  align-items: stretch !important;
+  height: auto !important;
+  min-height: 60px !important;
+}}
+
+[data-testid="stDataEditor"] div[role="grid"] {{
+  overflow: visible !important;
+}}
+
+/* Ensure table containers allow proper height */
+[data-testid="stDataFrame"],
+[data-testid="stTable"],
+[data-testid="stDataEditor"] {{
+  height: auto !important;
+  min-height: auto !important;
+  overflow: visible !important;
+}}
+
+/* Force word wrapping on any table-like structure */
 .stDataFrame table,
 .stTable table,
 .stDataEditor table {{
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
-    table-layout: auto !important;
-    width: 100% !important;
+  table-layout: auto !important;
+  width: 100% !important;
 }}
 
 .stDataFrame td,
@@ -241,47 +246,46 @@ label,
 .stTable th,
 .stDataEditor td,
 .stDataEditor th {{
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
-    white-space: pre-wrap !important;
-    word-wrap: break-word !important;
-    word-break: break-word !important;
-    overflow-wrap: anywhere !important;
-    line-height: 1.4 !important;
-    padding: 8px 12px !important;
-    vertical-align: top !important;
-    max-width: 300px !important;
-    height: auto !important;
-    border: 1px solid #E5E7EB !important;
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.4 !important;
+  padding: 8px 12px !important;
+  vertical-align: top !important;
+  max-width: 300px !important;
+  height: auto !important;
 }}
 
-/* Sidebar forcing */
-.css-1d391kg, .css-1lcbmhc, .css-1outpf7, .sidebar {{
-    background-color: #F8F9FA !important;
-    color: #000000 !important;
+/* Preview table legacy */
+.preview-table table {{
+  background: #FFFFFF !important; 
+  color: #000000 !important; 
+  border-collapse: collapse !important; 
+  width: 100%;
+  table-layout: auto !important;
 }}
 
-/* Info/warning/error boxes */
-.stAlert, .stSuccess, .stInfo, .stWarning, .stError {{
-    background-color: #F8F9FA !important;
-    color: #000000 !important;
-    border: 1px solid #E5E7EB !important;
+.preview-table th, 
+.preview-table td {{
+  border: 1px solid #000000 !important; 
+  padding: 8px 12px !important; 
+  vertical-align: top !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.4 !important;
+  max-width: 300px !important;
+  height: auto !important;
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
 }}
 
-/* Expander */
-.streamlit-expanderHeader, .streamlit-expanderContent {{
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
-}}
-
-/* Progress bars */
-.stProgress > div > div {{
-    background-color: {PRIMARY} !important;
-}}
-
-/* Spinner */
-.stSpinner > div {{
-    border-top-color: {PRIMARY} !important;
+.preview-table th {{ 
+  font-weight: 700 !important; 
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -1531,9 +1535,11 @@ def view_unsold_summary():
 def header():
     cols = st.columns([1, 6, 1.2])
     with cols[0]:
-        logo_path = next((p for p in ["H2.svg", "cars24_logo.svg", "logo.svg", "cars24.png"] if os.path.exists(p)), None)
-        if logo_path: st.image(logo_path, width=100, use_container_width=False)
-        else:
+        # Try to load H2.svg logo
+        try:
+            st.image("H2.svg", width=100, use_container_width=False)
+        except:
+            # Fallback if H2.svg not found
             st.markdown(
                 f"<div style='height:40px;display:flex;align-items:center;'><div style='background:{PRIMARY};padding:6px 10px;border-radius:6px;'><span style='font-weight:800;color:#FFFFFF'>CARS24</span></div></div>",
                 unsafe_allow_html=True
