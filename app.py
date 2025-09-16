@@ -99,36 +99,6 @@ PRIMARY = "#4436F5"
 st.markdown(f"""
 <style>
 /* ================================= */
-/* FORCE LIGHT MODE OVERRIDE */
-/* ================================= */
-
-/* Override Streamlit's automatic dark mode detection */
-.stApp, [data-testid="stApp"] {{
-    color-scheme: light !important;
-}}
-
-/* Force light theme on root elements */
-:root {{
-    color-scheme: light !important;
-}}
-
-/* Override any dark mode CSS variables */
-:root, [data-theme="dark"], .dark {{
-    --background-color: #FFFFFF !important;
-    --secondary-background-color: #F0F2F6 !important;
-    --text-color: #000000 !important;
-    --primary-color: {PRIMARY} !important;
-}}
-
-/* Override Streamlit's dark mode classes */
-.stApp[data-theme="dark"], 
-[data-testid="stAppViewContainer"][data-theme="dark"],
-.main[data-theme="dark"] {{
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
-}}
-
-/* ================================= */
 /* GLOBAL PAGE STYLING */
 /* ================================= */
 
@@ -190,13 +160,6 @@ div.stButton > button.cta {{
     color: #FFFFFF !important;               /* Ensure WHITE text */
 }}
 
-/* Override any dark mode button styles */
-[data-theme="dark"] div.stButton > button {{
-    background-color: {PRIMARY} !important;
-    color: #FFFFFF !important;
-    border: 1px solid {PRIMARY} !important;
-}}
-
 /* ================================= */
 /* FORM STYLING */
 /* ================================= */
@@ -223,22 +186,6 @@ label, .stSelectbox label, .stDateInput label, .stTextInput label {{
   color: #000000 !important;           /* Black text for labels */
 }}
 
-/* Override dark mode form styles */
-[data-theme="dark"] input,
-[data-theme="dark"] select,
-[data-theme="dark"] textarea {{
-  background-color: #FFFFFF !important;
-  color: #000000 !important;
-  border: 1px solid #D1D5DB !important;
-}}
-
-[data-theme="dark"] label,
-[data-theme="dark"] .stSelectbox label,
-[data-theme="dark"] .stDateInput label,
-[data-theme="dark"] .stTextInput label {{ 
-  color: #000000 !important;
-}}
-
 /* ================================= */
 /* TABLE STYLING - AGGRESSIVE APPROACH */
 /* ================================= */
@@ -253,13 +200,6 @@ label, .stSelectbox label, .stDateInput label, .stTextInput label {{
 [data-testid="stDataFrame"] * {{
     color: #000000 !important;             /* Force ALL child elements to black text */
     background-color: transparent !important; /* Transparent background for children */
-}}
-
-/* Override dark mode dataframe styles */
-[data-theme="dark"] [data-testid="stDataFrame"],
-[data-theme="dark"] [data-testid="stDataFrame"] * {{
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
 }}
 
 /* ATTEMPT 3: Target specific table cell types */
@@ -355,50 +295,6 @@ table td, table th {{
 }}
 
 /* ================================= */
-/* SIDEBAR OVERRIDE */
-/* ================================= */
-
-/* Force sidebar to light theme */
-.css-1d391kg, 
-.css-1lcbmhc,
-[data-testid="stSidebar"],
-.stSidebar {{
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
-}}
-
-.css-1d391kg *, 
-.css-1lcbmhc *,
-[data-testid="stSidebar"] *,
-.stSidebar * {{
-    color: #000000 !important;
-}}
-
-/* Override dark mode sidebar */
-[data-theme="dark"] .css-1d391kg,
-[data-theme="dark"] .css-1lcbmhc,
-[data-theme="dark"] [data-testid="stSidebar"],
-[data-theme="dark"] .stSidebar {{
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
-}}
-
-/* ================================= */
-/* TEXT ELEMENTS - CAREFUL WITH BUTTONS */
-/* ================================= */
-
-/* Force text elements to dark text, but exclude buttons */
-h1:not(button), h2:not(button), h3:not(button), h4:not(button), h5:not(button), h6:not(button), 
-p:not(button), span:not(button), div:not(button):not([data-testid*="stButton"]) {{
-    color: #000000 !important;
-}}
-
-/* Override markdown text but not buttons */
-.stMarkdown *:not(button) {{
-    color: #000000 !important;
-}}
-
-/* ================================= */
 /* TEXT WRAPPING */
 /* ================================= */
 
@@ -423,7 +319,7 @@ p:not(button), span:not(button), div:not(button):not([data-testid*="stButton"]) 
 /* JAVASCRIPT BACKUP APPROACH */
 /* ================================= */
 
-/* If CSS fails, use JavaScript to force black text but preserve button colors */
+/* If CSS fails, use JavaScript to force black text */
 setTimeout(function() {{
     /* Find all dataframe elements */
     var dataframes = document.querySelectorAll('[data-testid="stDataFrame"]');
@@ -445,21 +341,9 @@ setTimeout(function() {{
         }});
     }});
     
-    /* Force light theme detection override */
-    document.documentElement.removeAttribute('data-theme');
-    document.body.removeAttribute('data-theme');
-    document.documentElement.setAttribute('data-theme', 'light');
-    document.documentElement.style.setProperty('color-scheme', 'light');
-    
     /* Log to console for debugging */
-    console.log('Applied light theme override to', dataframes.length, 'dataframes');
+    console.log('Applied black text to', dataframes.length, 'dataframes');
 }}, 1000); /* Wait 1 second for page to load */
-
-/* Continuously enforce light theme */
-setInterval(function() {{
-    document.documentElement.setAttribute('data-theme', 'light');
-    document.documentElement.style.setProperty('color-scheme', 'light');
-}}, 5000);
 </script>
 """, unsafe_allow_html=True)
 
