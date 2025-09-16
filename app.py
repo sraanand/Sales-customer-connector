@@ -91,23 +91,62 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+# Force light theme regardless of system settings
+st._config.set_option('theme.base', 'light')
+
 PRIMARY = "#4436F5"
 
 st.markdown(f"""
 <style>
 /* ================================= */
+/* FORCE LIGHT MODE OVERRIDE */
+/* ================================= */
+
+/* Override Streamlit's automatic dark mode detection */
+.stApp, [data-testid="stApp"] {{
+    color-scheme: light !important;
+}}
+
+/* Force light theme on root elements */
+:root {{
+    color-scheme: light !important;
+}}
+
+/* Override any dark mode CSS variables */
+:root, [data-theme="dark"], .dark {{
+    --background-color: #FFFFFF !important;
+    --secondary-background-color: #F0F2F6 !important;
+    --text-color: #000000 !important;
+    --primary-color: {PRIMARY} !important;
+}}
+
+/* ================================= */
 /* GLOBAL PAGE STYLING */
 /* ================================= */
 
 /* Force the entire app container to have white background */
-html, body, [data-testid="stAppViewContainer"] {{
-  background-color: #FFFFFF !important;  /* White background for entire page */
-  color: #000000 !important;             /* Black text for entire page */
+html, body, [data-testid="stAppViewContainer"], .main, .block-container {{
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+}}
+
+/* Override Streamlit's dark mode classes */
+.stApp[data-theme="dark"], 
+[data-testid="stAppViewContainer"][data-theme="dark"],
+.main[data-theme="dark"] {{
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+}}
+
+/* Force all child elements to inherit light theme */
+* {{
+    color: #000000 !important;
+    background-color: transparent !important;
 }}
 
 /* Set maximum width for the main content area */
 .block-container {{ 
-  max-width: 1200px !important;          /* Limit content width to 1200px */
+  max-width: 1200px !important;
 }}
 
 /* ================================= */
@@ -116,45 +155,40 @@ html, body, [data-testid="stAppViewContainer"] {{
 
 /* Center the main page title */
 .header-title {{ 
-    color: {PRIMARY} !important;         /* Use primary blue color for title */
-    text-align: center !important;       /* Center the title horizontally */
-    margin: 0 !important;                /* Remove default margins */
+    color: {PRIMARY} !important;
+    text-align: center !important;
+    margin: 0 !important;
 }}
 
 /* Style the horizontal divider line */
 hr.div {{ 
-  border: 0;                           /* Remove default border */
-  border-top: 1px solid #E5E7EB;      /* Add thin gray top border */
-  margin: 12px 0 8px;                  /* Add spacing above and below */
+  border: 0;
+  border-top: 1px solid #E5E7EB;
+  margin: 12px 0 8px;
 }}
 
 /* ================================= */
 /* BUTTON STYLING */
 /* ================================= */
 
-/* Style all Streamlit buttons */
-div.stButton > button {{
-    background-color: {PRIMARY} !important;  /* Blue background */
-    color: #FFFFFF !important;               /* WHITE text on buttons */
-    border: 1px solid {PRIMARY} !important;  /* Blue border */
-    border-radius: 12px !important;          /* Rounded corners */
-    font-weight: 600 !important;             /* Bold text */
+/* Style all Streamlit buttons - override dark mode */
+div.stButton > button,
+button[kind="primary"],
+button[kind="secondary"] {{
+    background-color: {PRIMARY} !important;
+    color: #FFFFFF !important;
+    border: 1px solid {PRIMARY} !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
 }}
 
 /* Button hover effects */
-div.stButton > button:hover {{ 
-    background-color: {PRIMARY} !important;  /* Keep blue on hover */
-    color: #FFFFFF !important;               /* Keep WHITE text on hover */
-}}
-
-/* Special styling for call-to-action buttons */
-div.stButton > button.cta {{ 
-    width: 100% !important;                  /* Full width */
-    height: 100px !important;                /* Taller height */
-    font-size: 18px !important;              /* Larger text */
-    text-align: left !important;             /* Left-align text */
-    border-radius: 16px !important;          /* More rounded corners */
-    color: #FFFFFF !important;               /* Ensure WHITE text */
+div.stButton > button:hover,
+button[kind="primary"]:hover,
+button[kind="secondary"]:hover {{ 
+    background-color: {PRIMARY} !important;
+    color: #FFFFFF !important;
+    opacity: 0.9 !important;
 }}
 
 /* ================================= */
@@ -163,184 +197,169 @@ div.stButton > button.cta {{
 
 /* Layout for form elements in a row */
 .form-row {{ 
-  display: flex !important;            /* Use flexbox layout */
-  justify-content: center !important;  /* Center horizontally */
-  align-items: end !important;         /* Align to bottom */
-  gap: 12px !important;                /* Space between elements */
-  flex-wrap: wrap !important;          /* Wrap on small screens */
+  display: flex !important;
+  justify-content: center !important;
+  align-items: end !important;
+  gap: 12px !important;
+  flex-wrap: wrap !important;
 }}
 
-/* Style all form inputs */
-input, select, textarea {{
-  background-color: #FFFFFF !important;  /* White background for inputs */
-  color: #000000 !important;             /* Black text in inputs */
-  border: 1px solid #D1D5DB !important;  /* Gray border */
-  border-radius: 10px !important;        /* Rounded corners */
+/* Style all form inputs - force light theme */
+input, select, textarea,
+[data-testid="stTextInput"] input,
+[data-testid="stSelectbox"] select,
+[data-testid="stDateInput"] input,
+.stTextInput input,
+.stSelectbox select,
+.stDateInput input {{
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+  border: 1px solid #D1D5DB !important;
+  border-radius: 10px !important;
 }}
 
-/* Style all form labels */
-label, .stSelectbox label, .stDateInput label, .stTextInput label {{ 
-  color: #000000 !important;           /* Black text for labels */
+/* Style all form labels - force dark text */
+label, 
+.stSelectbox label, 
+.stDateInput label, 
+.stTextInput label,
+[data-testid="stSelectbox"] label,
+[data-testid="stDateInput"] label,
+[data-testid="stTextInput"] label {{
+  color: #000000 !important;
 }}
 
 /* ================================= */
-/* TABLE STYLING - AGGRESSIVE APPROACH */
+/* SIDEBAR OVERRIDE */
 /* ================================= */
 
-/* ATTEMPT 1: Target main dataframe container */
-[data-testid="stDataFrame"] {{
-    background-color: #FFFFFF !important;  /* Force white background */
-    color: #000000 !important;             /* Force black text */
-}}
-
-/* ATTEMPT 2: Target ALL children of dataframe */
-[data-testid="stDataFrame"] * {{
-    color: #000000 !important;             /* Force ALL child elements to black text */
-    background-color: transparent !important; /* Transparent background for children */
-}}
-
-/* ATTEMPT 3: Target specific table cell types */
-[data-testid="stDataFrame"] div[role="cell"] {{
-  background-color: #FFFFFF !important;    /* White background for cells */
-  color: #000000 !important;               /* BLACK text for cells */
-  border: 1px solid #CCCCCC !important;    /* Gray border to see cell boundaries */
-  padding: 8px !important;                 /* Padding inside cells */
-}}
-
-/* ATTEMPT 4: Target column headers specifically */
-[data-testid="stDataFrame"] div[role="columnheader"] {{
-  background-color: #F8F9FA !important;    /* Light gray background for headers */
-  color: #000000 !important;               /* BLACK text for headers */
-  font-weight: bold !important;            /* Bold header text */
-  border: 1px solid #CCCCCC !important;    /* Gray border */
-  padding: 8px !important;                 /* Padding inside headers */
-}}
-
-/* ATTEMPT 5: Target grid cells */
-[data-testid="stDataFrame"] div[role="gridcell"] {{
-  background-color: #FFFFFF !important;    /* White background */
-  color: #000000 !important;               /* BLACK text */
-  border: 1px solid #CCCCCC !important;    /* Gray border */
-  padding: 8px !important;                 /* Padding */
-}}
-
-/* ATTEMPT 6: Target any div inside table cells */
-[data-testid="stDataFrame"] div[role="cell"] div {{
-    color: #000000 !important;             /* Force black text on cell divs */
-}}
-
-[data-testid="stDataFrame"] div[role="columnheader"] div {{
-    color: #000000 !important;             /* Force black text on header divs */
-}}
-
-[data-testid="stDataFrame"] div[role="gridcell"] div {{
-    color: #000000 !important;             /* Force black text on gridcell divs */
-}}
-
-/* ATTEMPT 7: Target spans inside cells */
-[data-testid="stDataFrame"] span {{
-    color: #000000 !important;             /* Force black text on spans */
-}}
-
-/* ATTEMPT 8: Alternative dataframe selectors */
-.stDataFrame {{
-    color: #000000 !important;             /* Black text for stDataFrame class */
-}}
-
-.stDataFrame * {{
-    color: #000000 !important;             /* Black text for all children */
-}}
-
-/* ATTEMPT 9: Use CSS pseudo-selectors */
-[data-testid="stDataFrame"] *:not(button):not(input) {{
-    color: #000000 !important;             /* Black text except buttons and inputs */
-}}
-
-/* ATTEMPT 10: Nuclear option - override any text color */
-div[data-testid="stDataFrame"] {{
+/* Force sidebar to light theme */
+.css-1d391kg, 
+.css-1lcbmhc,
+[data-testid="stSidebar"],
+.stSidebar {{
+    background-color: #FFFFFF !important;
     color: #000000 !important;
 }}
 
-div[data-testid="stDataFrame"] > * {{
-    color: #000000 !important;
-}}
-
-div[data-testid="stDataFrame"] > * > * {{
-    color: #000000 !important;
-}}
-
-div[data-testid="stDataFrame"] > * > * > * {{
+.css-1d391kg *, 
+.css-1lcbmhc *,
+[data-testid="stSidebar"] *,
+.stSidebar * {{
     color: #000000 !important;
 }}
 
 /* ================================= */
-/* ALTERNATIVE TABLE STYLING */
+/* TABLE STYLING - AGGRESSIVE OVERRIDE */
 /* ================================= */
 
-/* Style regular HTML tables if Streamlit falls back to them */
-table {{
-    background-color: #FFFFFF !important;  /* White table background */
-    color: #000000 !important;             /* Black table text */
-    border-collapse: collapse !important;   /* Merge borders */
+/* Force all dataframes to light theme */
+[data-testid="stDataFrame"],
+[data-testid="stDataFrame"] *,
+.dataframe,
+.dataframe * {{
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
 }}
 
-table td, table th {{
-    background-color: #FFFFFF !important;  /* White cell background */
-    color: #000000 !important;             /* BLACK cell text */
-    border: 1px solid #CCCCCC !important;  /* Gray cell borders */
-    padding: 8px !important;               /* Cell padding */
+/* Override any dark theme table styles */
+[data-testid="stDataFrame"][data-theme="dark"],
+[data-testid="stDataFrame"][data-theme="dark"] * {{
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+}}
+
+table, table td, table th {{
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+    border: 1px solid #CCCCCC !important;
+    padding: 8px !important;
 }}
 
 /* ================================= */
-/* TEXT WRAPPING */
+/* METRIC AND STATUS ELEMENTS */
 /* ================================= */
 
-/* Ensure text wraps properly in all table cells */
-[data-testid="stDataFrame"] div[role="cell"],
-[data-testid="stDataFrame"] div[role="columnheader"],
-[data-testid="stDataFrame"] div[role="gridcell"] {{
-  white-space: pre-wrap !important;        /* Preserve line breaks and wrap */
-  word-wrap: break-word !important;        /* Break long words */
-  overflow-wrap: anywhere !important;      /* Allow breaking anywhere */
-  line-height: 1.4 !important;             /* Readable line spacing */
-  max-width: none !important;              /* No width restrictions */
-  height: auto !important;                 /* Auto height */
-  min-height: 40px !important;             /* Minimum cell height */
-  vertical-align: top !important;          /* Align content to top */
-  overflow: visible !important;            /* Show all content */
+/* Override metric widgets */
+[data-testid="metric-container"],
+[data-testid="metric-container"] * {{
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+}}
+
+/* Override status elements */
+.stSuccess, .stError, .stWarning, .stInfo {{
+    color: #000000 !important;
+}}
+
+/* ================================= */
+/* TEXT ELEMENTS */
+/* ================================= */
+
+/* Force all text elements to dark text */
+h1, h2, h3, h4, h5, h6, p, span, div {{
+    color: #000000 !important;
+}}
+
+/* Override markdown text */
+.stMarkdown, .stMarkdown * {{
+    color: #000000 !important;
+}}
+
+/* Override code blocks */
+.stCode, .stCode * {{
+    background-color: #F8F9FA !important;
+    color: #000000 !important;
+}}
+
+/* ================================= */
+/* FINAL NUCLEAR OPTION */
+/* ================================= */
+
+/* If all else fails, force everything to light theme */
+[data-theme="dark"] {{
+    filter: invert(0) !important;
+}}
+
+body[data-theme="dark"] {{
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
 }}
 </style>
 
 <script>
-/* ================================= */
-/* JAVASCRIPT BACKUP APPROACH */
-/* ================================= */
-
-/* If CSS fails, use JavaScript to force black text */
-setTimeout(function() {{
-    /* Find all dataframe elements */
-    var dataframes = document.querySelectorAll('[data-testid="stDataFrame"]');
-    
-    /* Loop through each dataframe */
-    dataframes.forEach(function(df) {{
-        /* Set black text on the container */
-        df.style.color = '#000000';
-        df.style.backgroundColor = '#FFFFFF';
+// JavaScript to force light mode
+(function() {{
+    // Remove any dark theme attributes
+    function forceLightMode() {{
+        document.documentElement.removeAttribute('data-theme');
+        document.body.removeAttribute('data-theme');
+        document.documentElement.setAttribute('data-theme', 'light');
         
-        /* Find all child elements and force black text */
-        var allChildren = df.querySelectorAll('*');
-        allChildren.forEach(function(child) {{
-            child.style.color = '#000000';
-            /* Don't override button backgrounds */
-            if (!child.matches('button')) {{
-                child.style.backgroundColor = 'transparent';
-            }}
+        // Find and update any dark theme elements
+        const darkElements = document.querySelectorAll('[data-theme="dark"]');
+        darkElements.forEach(el => {{
+            el.setAttribute('data-theme', 'light');
         }});
-    }});
+        
+        // Force light color scheme
+        document.documentElement.style.setProperty('color-scheme', 'light');
+    }}
     
-    /* Log to console for debugging */
-    console.log('Applied black text to', dataframes.length, 'dataframes');
-}}, 1000); /* Wait 1 second for page to load */
+    // Run on page load
+    forceLightMode();
+    
+    // Run periodically to catch dynamic changes
+    setInterval(forceLightMode, 1000);
+    
+    // Run when DOM changes
+    const observer = new MutationObserver(forceLightMode);
+    observer.observe(document.body, {{
+        attributes: true,
+        childList: true,
+        subtree: true
+    }});
+}})();
 </script>
 """, unsafe_allow_html=True)
 
@@ -392,6 +411,24 @@ def parse_epoch_or_iso_to_local_time(s) -> str:
         return dt.strftime("%H:%M")
     except Exception:
         return ""
+
+def force_light_theme():
+    """Force light theme regardless of system settings"""
+    st.markdown("""
+    <script>
+    // Override system preference
+    window.matchMedia = function(query) {
+        if (query === '(prefers-color-scheme: dark)') {
+            return {
+                matches: false,
+                addListener: function() {},
+                removeListener: function() {}
+            };
+        }
+        return originalMatchMedia(query);
+    };
+    </script>
+    """, unsafe_allow_html=True)
 
 def parse_td_slot_time_prop(val) -> str:
     """Parse HubSpot 'td_booking_slot_time' -> 'HH:MM' local if epoch, or normalize common strings."""
@@ -1120,12 +1157,13 @@ def hs_batch_read_deals(deal_ids: list[str], props: list[str]) -> dict[str, dict
 # ============ Aircall ============
 def send_sms_via_aircall(phone: str, message: str, number_id: str = None) -> tuple[bool, str]:
     """Send SMS with specified Aircall number ID"""
-    # Use default number if none specified
-    if number_id is None:
+    # Use default number if none specified OR if empty string
+    if not number_id:  # This catches None, "", and other falsy values
         number_id = AIRCALL_NUMBER_ID
     
     try:
         url = f"{AIRCALL_BASE_URL}/numbers/{number_id}/messages/native/send"
+        print(f"DEBUG: Using Aircall number ID: {number_id}")  # Debug line
         resp = requests.post(url, json={"to": phone, "body": message}, auth=(AIRCALL_ID, AIRCALL_TOKEN), timeout=12)
         resp.raise_for_status()
         return True, "sent"
@@ -1817,6 +1855,11 @@ def view_reminders():
                 st.success(f"🎉 Done! Sent: {sent} | Failed: {failed}")
 
 def view_manager():
+    # DEBUG: Check Aircall number IDs
+    st.write(f"DEBUG - AIRCALL_NUMBER_ID: {AIRCALL_NUMBER_ID}")
+    st.write(f"DEBUG - AIRCALL_NUMBER_ID_2: {AIRCALL_NUMBER_ID_2}")
+    st.write(f"DEBUG - AIRCALL_NUMBER_ID_2 is None: {AIRCALL_NUMBER_ID_2 is None}")
+    
     st.subheader("👔  Manager Follow-Ups")
     with st.form("manager_form"):
         st.markdown('<div class="form-row">', unsafe_allow_html=True)
@@ -2087,6 +2130,7 @@ if "view" not in st.session_state:
 
 def header_and_route():
     header()
+    force_light_theme()  # Add this line
     v = st.session_state.get("view","home")
     if v == "home":
         ctas()
