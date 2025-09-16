@@ -77,7 +77,8 @@ DEAL_PROPS = [
     "td_conducted_date",
     "vehicle_make", "vehicle_model",
     "car_location_at_time_of_sale",
-    "video_url__short_",  # ADD THIS LINE
+    "video_url__short_", 
+    "td_reminder_sms_sent",  # ADD THIS LINE
 ]
 
 STAGE_LABELS = {
@@ -522,6 +523,92 @@ def filter_internal_test_emails(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Data
         removed["Reason"] = "Internal/test email domain"
     return work[mask].copy(), removed
 
+def filter_sms_already_sent(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Filter out deals where td_reminder_sms_sent is already 'Yes' or 'true'.
+    Returns (kept_df, removed_df) where removed_df includes a Reason column.
+    """
+    if df is None or df.empty or "td_reminder_sms_sent" not in df.columns:
+        return df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame(), pd.DataFrame()
+    
+    work = df.copy()
+    
+    # Check if SMS was already sent
+    work["sms_sent"] = work["td_reminder_sms_sent"].apply(
+        lambda x: str(x).lower() in ['yes', 'true'] if pd.notna(x) else False
+    )
+    
+    removed = work[work["sms_sent"]].drop(columns=["sms_sent"]).copy()
+    kept = work[~work["sms_sent"]].drop(columns=["sms_sent"]).copy()
+    
+    if not removed.empty:
+        removed["Reason"] = "SMS reminder already sent (td_reminder_sms_sent = Yes)"
+    
+    return kept, removed
+
+def update_deals_sms_sent(deal_ids: list[str]) -> tuple[int, int]:
+    """
+    Update the td_reminder_sms_sent property to 'Yes' for the given deal IDs.
+    Returns (success_count, failure_count)
+    """
+    if not deal_ids:
+        return 0, 0
+    
+    success_count = 0
+    failure_count = 0
+    
+    url = f"{HS_ROOT}/crm/v3/objects/deals/batch/update"
+    
+    # Process in batches of 100 (HubSpot limit)
+    for i in range(0, len(deal_ids), 100):
+        batch = deal_ids[i:i+100]
+        
+        inputs = []
+        for deal_id in batch:
+            inputs.append({
+                "id": str(deal_id),
+                "properties": {
+                    "td_reminder_sms_sent": "Yes"
+                }
+            })
+        
+        payload = {"inputs": inputs}
+        
+        try:
+            response = requests.post(url, headers=hs_headers(), json=payload, timeout=25)
+            if response.status_code == 200:
+                success_count += len(batch)
+            else:
+                failure_count += len(batch)
+                st.warning(f"Failed to update batch: {response.text[:200]}")
+        except Exception as e:
+            failure_count += len(batch)
+            st.warning(f"Error updating deals: {str(e)}")
+    
+    return success_count, failure_count
+
+def get_all_deal_ids_for_contacts(messages_df: pd.DataFrame, deals_df: pd.DataFrame) -> dict[str, list[str]]:
+    """
+    For each phone number in messages_df, get all associated deal IDs from deals_df.
+    Returns a dict mapping phone -> list of deal IDs
+    """
+    phone_to_deals = {}
+    
+    if messages_df is None or messages_df.empty or deals_df is None or deals_df.empty:
+        return phone_to_deals
+    
+    # Create a mapping of normalized phone to deal IDs
+    for _, msg_row in messages_df.iterrows():
+        phone = str(msg_row.get("Phone", "")).strip()
+        if not phone:
+            continue
+        
+        # Find all deals with this phone number
+        matching_deals = deals_df[deals_df["phone_norm"] == phone]["hs_object_id"].tolist()
+        phone_to_deals[phone] = [str(d) for d in matching_deals if d]
+    
+    return phone_to_deals
+
 def show_removed_table(df: pd.DataFrame, title: str):
     """Small helper to render removed items table (if any)."""
     if df is None or df.empty:
@@ -583,6 +670,23 @@ def hs_get_owner_info(owner_id):
             return None
     except Exception:
         return None
+
+def export_sms_update_list(phone_to_deals: dict, sent_phones: list) -> pd.DataFrame:
+    """
+    Create a DataFrame with deal IDs that need to be updated after SMS send.
+    """
+    update_records = []
+    for phone in sent_phones:
+        if phone in phone_to_deals:
+            for deal_id in phone_to_deals[phone]:
+                update_records.append({
+                    "Deal ID": deal_id,
+                    "td_reminder_sms_sent": "Yes",
+                    "Phone": phone,
+                    "Update Time": datetime.now(MEL_TZ).strftime("%Y-%m-%d %H:%M:%S")
+                })
+    
+    return pd.DataFrame(update_records)
 
 def build_messages_with_audit(dedup_df: pd.DataFrame, mode: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -1808,29 +1912,37 @@ def view_reminders():
         )
         deals = prepare_deals(raw)
 
-        # 1) Filter by appointment_id car active purchases (NEW APPROACH)
-        deals_car_filtered, dropped_car_purchases = filter_deals_by_appointment_id_car_active_purchases(deals)
+        # 1) NEW: Filter out deals where SMS was already sent
+        deals_not_sent, removed_sms_sent = filter_sms_already_sent(deals)
 
-        # 2) Filter internal/test emails + show callout
+        # 2) Filter by appointment_id car active purchases
+        deals_car_filtered, dropped_car_purchases = filter_deals_by_appointment_id_car_active_purchases(deals_not_sent)
+
+        # 3) Filter internal/test emails
         deals_f, removed_internal = filter_internal_test_emails(deals_car_filtered)
 
-        # 3) Audit dedupe (returns dedup + dropped list with reasons)
+        # 4) Audit dedupe
         dedup, dedupe_dropped = dedupe_users_with_audit(deals_f, use_conducted=False)
 
-        # 4) Build messages with audit (messages + skipped list with reasons)
+        # 5) Build messages with audit
         msgs, skipped_msgs = build_messages_with_audit(dedup, mode="reminder")
 
-        # persist all artifacts so checkboxes don't reset the page
+        # Store all artifacts
         st.session_state["reminders_deals"] = deals_f
+        st.session_state["reminders_removed_sms_sent"] = removed_sms_sent  # NEW
         st.session_state["reminders_dropped_car_purchases"] = dropped_car_purchases
         st.session_state["reminders_removed_internal"] = removed_internal
         st.session_state["reminders_dedup"] = dedup
         st.session_state["reminders_dedupe_dropped"] = dedupe_dropped
         st.session_state["reminders_msgs"]  = msgs
         st.session_state["reminders_skipped_msgs"] = skipped_msgs
+        
+        # Store phone-to-deals mapping for later update
+        st.session_state["reminders_phone_to_deals"] = get_all_deal_ids_for_contacts(msgs, deals_f)
 
     # ---- Render from persisted state ----
     deals_f      = st.session_state.get("reminders_deals")
+    removed_sms  = st.session_state.get("reminders_removed_sms_sent")  # NEW
     dropped_car  = st.session_state.get("reminders_dropped_car_purchases")
     removed_int  = st.session_state.get("reminders_removed_internal")
     dedup        = st.session_state.get("reminders_dedup")
@@ -1838,7 +1950,12 @@ def view_reminders():
     msgs         = st.session_state.get("reminders_msgs")
     skipped_msgs = st.session_state.get("reminders_skipped_msgs")
 
-    # Show car purchase filter results FIRST
+    # NEW: Show SMS already sent filter results FIRST
+    if isinstance(removed_sms, pd.DataFrame) and not removed_sms.empty:
+        st.warning(f"⚠️ {len(removed_sms)} deals excluded - SMS reminders already sent")
+        show_removed_table(removed_sms, "Removed (SMS reminder already sent)")
+
+    # Show car purchase filter results
     if isinstance(dropped_car, pd.DataFrame) and not dropped_car.empty:
         show_removed_table(dropped_car, "Removed (car has active purchase deal via appointment_id)")
 
@@ -1846,11 +1963,19 @@ def view_reminders():
         show_removed_table(removed_int, "Removed by domain filter (cars24.com / yopmail.com)")
 
     if isinstance(deals_f, pd.DataFrame) and not deals_f.empty:
+        # Update column display to include SMS status
         render_trimmed(deals_f, "Filtered deals (trimmed)", [
-            ("hs_object_id","Deal ID"), ("appointment_id","Appointment ID"), ("full_name","Customer"), ("email","Email"), ("phone_norm","Phone"),
-            ("vehicle_make","Make"), ("vehicle_model","Model"),
-            ("slot_date_prop","TD booking date"), ("slot_time_param","Time"),
-            ("video_url__short_","Video URL"), 
+            ("hs_object_id","Deal ID"), 
+            ("appointment_id","Appointment ID"), 
+            ("full_name","Customer"), 
+            ("email","Email"), 
+            ("phone_norm","Phone"),
+            ("vehicle_make","Make"), 
+            ("vehicle_model","Model"),
+            ("slot_date_prop","TD booking date"), 
+            ("slot_time_param","Time"),
+            ("video_url__short_","Video URL"),
+            ("td_reminder_sms_sent","SMS Sent"),  # NEW
             ("Stage","Stage"),
         ])
 
@@ -1870,6 +1995,7 @@ def view_reminders():
             st.markdown("**Skipped while creating SMS**")
             st.dataframe(skipped_msgs, use_container_width=True)
 
+        # MODIFIED: Send SMS button with deal update functionality
         if not edited.empty and st.button("Send SMS"):
             to_send = edited[edited["Send"]]
             if to_send.empty:
@@ -1879,13 +2005,38 @@ def view_reminders():
             else:
                 st.info("Sending messages…")
                 sent, failed = 0, 0
+                sent_phones = []  # Track which phones were sent successfully
+                
                 for _, r in to_send.iterrows():
                     ok, msg = send_sms_via_aircall(r["Phone"], r["SMS draft"], AIRCALL_NUMBER_ID)
-                    if ok: sent += 1; st.success(f"✅ Sent to {r['Phone']}")
-                    else:  failed += 1; st.error(f"❌ Failed for {r['Phone']}: {msg}")
+                    if ok: 
+                        sent += 1
+                        sent_phones.append(r["Phone"])
+                        st.success(f"✅ Sent to {r['Phone']}")
+                    else:  
+                        failed += 1
+                        st.error(f"❌ Failed for {r['Phone']}: {msg}")
                     time.sleep(1)
+                
+                # NEW: Update deals in HubSpot after successful sends
+                if sent_phones and st.session_state.get("reminders_phone_to_deals"):
+                    st.info("Updating HubSpot deals...")
+                    phone_to_deals = st.session_state["reminders_phone_to_deals"]
+                    
+                    all_deal_ids = []
+                    for phone in sent_phones:
+                        if phone in phone_to_deals:
+                            all_deal_ids.extend(phone_to_deals[phone])
+                    
+                    if all_deal_ids:
+                        update_success, update_fail = update_deals_sms_sent(all_deal_ids)
+                        if update_success > 0:
+                            st.success(f"✅ Updated {update_success} deals with SMS sent status")
+                        if update_fail > 0:
+                            st.warning(f"⚠️ Failed to update {update_fail} deals")
+                
                 if sent: st.balloons()
-                st.success(f"🎉 Done! Sent: {sent} | Failed: {failed}")
+                st.success(f"🎉 Done! SMS Sent: {sent} | Failed: {failed}")
 
 def view_manager():
     
