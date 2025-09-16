@@ -525,7 +525,7 @@ def filter_internal_test_emails(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Data
 
 def filter_sms_already_sent(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Filter out deals where td_reminder_sms_sent is already 'Yes' or 'true'.
+    Filter out deals where td_reminder_sms_sent is already 'true' or 'Yes'.
     Returns (kept_df, removed_df) where removed_df includes a Reason column.
     """
     if df is None or df.empty or "td_reminder_sms_sent" not in df.columns:
@@ -533,7 +533,7 @@ def filter_sms_already_sent(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFram
     
     work = df.copy()
     
-    # Check if SMS was already sent
+    # Check if SMS was already sent - check for both "true" (value) and "Yes" (label)
     work["sms_sent"] = work["td_reminder_sms_sent"].apply(
         lambda x: str(x).lower() in ['yes', 'true'] if pd.notna(x) else False
     )
@@ -542,13 +542,13 @@ def filter_sms_already_sent(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFram
     kept = work[~work["sms_sent"]].drop(columns=["sms_sent"]).copy()
     
     if not removed.empty:
-        removed["Reason"] = "SMS reminder already sent (td_reminder_sms_sent = Yes)"
+        removed["Reason"] = "SMS reminder already sent (td_reminder_sms_sent = true)"
     
     return kept, removed
 
 def update_deals_sms_sent(deal_ids: list[str]) -> tuple[int, int]:
     """
-    Update the td_reminder_sms_sent property to 'Yes' for the given deal IDs.
+    Update the td_reminder_sms_sent property to 'true' for the given deal IDs.
     Returns (success_count, failure_count)
     """
     if not deal_ids:
@@ -568,7 +568,7 @@ def update_deals_sms_sent(deal_ids: list[str]) -> tuple[int, int]:
             inputs.append({
                 "id": str(deal_id),
                 "properties": {
-                    "td_reminder_sms_sent": "Yes"
+                    "td_reminder_sms_sent": "true"  # CHANGED FROM "Yes" to "true"
                 }
             })
         
@@ -681,7 +681,7 @@ def export_sms_update_list(phone_to_deals: dict, sent_phones: list) -> pd.DataFr
             for deal_id in phone_to_deals[phone]:
                 update_records.append({
                     "Deal ID": deal_id,
-                    "td_reminder_sms_sent": "Yes",
+                    "td_reminder_sms_sent": "true",
                     "Phone": phone,
                     "Update Time": datetime.now(MEL_TZ).strftime("%Y-%m-%d %H:%M:%S")
                 })
