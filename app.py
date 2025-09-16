@@ -77,6 +77,7 @@ DEAL_PROPS = [
     "td_conducted_date",
     "vehicle_make", "vehicle_model",
     "car_location_at_time_of_sale",
+    "video_url__short_",  # ADD THIS LINE
 ]
 
 STAGE_LABELS = {
@@ -1203,15 +1204,30 @@ def draft_sms_reminder(name: str, pairs_text: str) -> str:
     system = (
         "You write outbound SMS for Cars24 Laverton (Australia). "
         "Tone: warm, polite, inviting, Australian. AU spelling. "
-        "Keep ~280 chars. No emojis/links. Avoid apostrophes. "
+        "Keep ~280 chars unless you are going to add video URLs too. can add limited emojis. Avoid apostrophes."
         "Write as the business (sender). Include a clear CTA to confirm or reschedule."
     )
-    user = f"Recipient name: {name or 'there'}.\nUpcoming test drive(s): {pairs_text}.\nFriendly reminder."
+    # Check if video URLs are provided
+    video_url_list = [url.strip() for url in video_urls.split(";") if url.strip()] if video_urls else []
+    has_video = len(video_url_list) > 0
+    
+    if has_video:
+        # Use first video URL and allow longer message
+        first_video_url = video_url_list[0]
+        system += " If video URL provided, encourage virtual tour before test drive. Keep ~400 chars max. No emojis/links except the provided video URL. Avoid apostrophes."
+        user = f"Recipient name: {name or 'there'}.\nUpcoming test drive(s): {pairs_text}.\nVideo tour URL: {first_video_url}.\nFriendly reminder with video tour suggestion."
+    else:
+        # Standard message without video
+        system += " Keep ~280 chars. No emojis/links. Avoid apostrophes."
+        user = f"Recipient name: {name or 'there'}.\nUpcoming test drive(s): {pairs_text}.\nFriendly reminder."
+    
     text = _call_openai([
         {"role":"system","content":system},
         {"role":"user","content":user}
     ]) or ""
+    
     return text if text.endswith("–Cars24 Laverton") else f"{text} –Cars24 Laverton".strip()
+
 
 def draft_sms_manager(name: str, pairs_text: str) -> str:
     first = (name or "").split()[0] if (name or "").strip() else "there"
@@ -1295,15 +1311,26 @@ def dedupe_users(df: pd.DataFrame, *, use_conducted: bool) -> pd.DataFrame:
                 t = r.get("slot_time_param") or r.get("slot_time") or ""
             when_rel = rel_date(d) if isinstance(d, date) else ""
             when_exact = (f"{format_date_au(d)} {t}".strip()).strip()
+
+            # Collect video URL
+            video_url = str(r.get("video_url__short_") or "").strip()
+
             cars_list.append(car)
             when_exact_list.append(when_exact)
             when_rel_list.append(when_rel if t == "" else f"{when_rel} at {t}".strip())
             stages_list.append(str(r.get("dealstage") or ""))
+            if video_url:  # Only add non-empty video URLs
+                video_urls_list.append(video_url)
+
         stage_labels = sorted({stage_label(x) for x in stages_list if str(x)})
         if STAGE_CONDUCTED_ID in stages_list: hint = "conducted"
         elif STAGE_BOOKED_ID in stages_list: hint = "booked"
         elif STAGE_ENQUIRY_ID in stages_list: hint = "enquiry"
         else: hint = "unknown"
+
+        # Get unique video URLs
+        unique_video_urls = list(set([url for url in video_urls_list if url]))
+
         rows.append({
             "CustomerName": name, "Phone": phone, "Email": email,
             "DealsCount": len([c for c in cars_list if c]),
@@ -1311,7 +1338,8 @@ def dedupe_users(df: pd.DataFrame, *, use_conducted: bool) -> pd.DataFrame:
             "WhenExact": "; ".join([w for w in when_exact_list if w]),
             "WhenRel": "; ".join([w for w in when_rel_list if w]),
             "DealStages": "; ".join(stage_labels) if stage_labels else "",
-            "StageHint": hint
+            "StageHint": hint,
+            "VideoURLs": "; ".join(unique_video_urls) if unique_video_urls else ""
         })
     out = pd.DataFrame(rows)
     want = ["CustomerName","Phone","Email","DealsCount","Cars","WhenExact","WhenRel","DealStages","StageHint"]
@@ -1337,9 +1365,10 @@ def build_messages_from_dedup(dedup_df: pd.DataFrame, mode: str) -> pd.DataFrame
         name  = str(row.get("CustomerName") or "").strip()
         cars  = str(row.get("Cars") or "").strip()
         when_rel = str(row.get("WhenRel") or "").strip()
+        video_urls = str(row.get("VideoURLs") or "").strip()  # GET VIDEO URLS
         pairs_text = build_pairs_text(cars, when_rel)
         if mode == "reminder":
-            msg = draft_sms_reminder(name, pairs_text)
+            msg = draft_sms_reminder(name, pairs_text, video_urls)
         elif mode == "manager":
             msg = draft_sms_manager(name, pairs_text)
         else:
@@ -1858,10 +1887,6 @@ def view_reminders():
                 st.success(f"🎉 Done! Sent: {sent} | Failed: {failed}")
 
 def view_manager():
-    # DEBUG: Check Aircall number IDs
-    st.write(f"DEBUG - AIRCALL_NUMBER_ID: {AIRCALL_NUMBER_ID}")
-    st.write(f"DEBUG - AIRCALL_NUMBER_ID_2: {AIRCALL_NUMBER_ID_2}")
-    st.write(f"DEBUG - AIRCALL_NUMBER_ID_2 is None: {AIRCALL_NUMBER_ID_2 is None}")
     
     st.subheader("👔  Manager Follow-Ups")
     with st.form("manager_form"):
