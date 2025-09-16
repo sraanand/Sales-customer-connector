@@ -120,16 +120,6 @@ st.markdown(f"""
     --primary-color: {PRIMARY} !important;
 }}
 
-/* ================================= */
-/* GLOBAL PAGE STYLING */
-/* ================================= */
-
-/* Force the entire app container to have white background */
-html, body, [data-testid="stAppViewContainer"], .main, .block-container {{
-  background-color: #FFFFFF !important;
-  color: #000000 !important;
-}}
-
 /* Override Streamlit's dark mode classes */
 .stApp[data-theme="dark"], 
 [data-testid="stAppViewContainer"][data-theme="dark"],
@@ -138,15 +128,19 @@ html, body, [data-testid="stAppViewContainer"], .main, .block-container {{
     color: #000000 !important;
 }}
 
-/* Force all child elements to inherit light theme */
-* {{
-    color: #000000 !important;
-    background-color: transparent !important;
+/* ================================= */
+/* GLOBAL PAGE STYLING */
+/* ================================= */
+
+/* Force the entire app container to have white background */
+html, body, [data-testid="stAppViewContainer"] {{
+  background-color: #FFFFFF !important;  /* White background for entire page */
+  color: #000000 !important;             /* Black text for entire page */
 }}
 
 /* Set maximum width for the main content area */
 .block-container {{ 
-  max-width: 1200px !important;
+  max-width: 1200px !important;          /* Limit content width to 1200px */
 }}
 
 /* ================================= */
@@ -155,40 +149,52 @@ html, body, [data-testid="stAppViewContainer"], .main, .block-container {{
 
 /* Center the main page title */
 .header-title {{ 
-    color: {PRIMARY} !important;
-    text-align: center !important;
-    margin: 0 !important;
+    color: {PRIMARY} !important;         /* Use primary blue color for title */
+    text-align: center !important;       /* Center the title horizontally */
+    margin: 0 !important;                /* Remove default margins */
 }}
 
 /* Style the horizontal divider line */
 hr.div {{ 
-  border: 0;
-  border-top: 1px solid #E5E7EB;
-  margin: 12px 0 8px;
+  border: 0;                           /* Remove default border */
+  border-top: 1px solid #E5E7EB;      /* Add thin gray top border */
+  margin: 12px 0 8px;                  /* Add spacing above and below */
 }}
 
 /* ================================= */
 /* BUTTON STYLING */
 /* ================================= */
 
-/* Style all Streamlit buttons - override dark mode */
-div.stButton > button,
-button[kind="primary"],
-button[kind="secondary"] {{
-    background-color: {PRIMARY} !important;
-    color: #FFFFFF !important;
-    border: 1px solid {PRIMARY} !important;
-    border-radius: 12px !important;
-    font-weight: 600 !important;
+/* Style all Streamlit buttons */
+div.stButton > button {{
+    background-color: {PRIMARY} !important;  /* Blue background */
+    color: #FFFFFF !important;               /* WHITE text on buttons */
+    border: 1px solid {PRIMARY} !important;  /* Blue border */
+    border-radius: 12px !important;          /* Rounded corners */
+    font-weight: 600 !important;             /* Bold text */
 }}
 
 /* Button hover effects */
-div.stButton > button:hover,
-button[kind="primary"]:hover,
-button[kind="secondary"]:hover {{ 
+div.stButton > button:hover {{ 
+    background-color: {PRIMARY} !important;  /* Keep blue on hover */
+    color: #FFFFFF !important;               /* Keep WHITE text on hover */
+}}
+
+/* Special styling for call-to-action buttons */
+div.stButton > button.cta {{ 
+    width: 100% !important;                  /* Full width */
+    height: 100px !important;                /* Taller height */
+    font-size: 18px !important;              /* Larger text */
+    text-align: left !important;             /* Left-align text */
+    border-radius: 16px !important;          /* More rounded corners */
+    color: #FFFFFF !important;               /* Ensure WHITE text */
+}}
+
+/* Override any dark mode button styles */
+[data-theme="dark"] div.stButton > button {{
     background-color: {PRIMARY} !important;
     color: #FFFFFF !important;
-    opacity: 0.9 !important;
+    border: 1px solid {PRIMARY} !important;
 }}
 
 /* ================================= */
@@ -197,36 +203,155 @@ button[kind="secondary"]:hover {{
 
 /* Layout for form elements in a row */
 .form-row {{ 
-  display: flex !important;
-  justify-content: center !important;
-  align-items: end !important;
-  gap: 12px !important;
-  flex-wrap: wrap !important;
+  display: flex !important;            /* Use flexbox layout */
+  justify-content: center !important;  /* Center horizontally */
+  align-items: end !important;         /* Align to bottom */
+  gap: 12px !important;                /* Space between elements */
+  flex-wrap: wrap !important;          /* Wrap on small screens */
 }}
 
-/* Style all form inputs - force light theme */
-input, select, textarea,
-[data-testid="stTextInput"] input,
-[data-testid="stSelectbox"] select,
-[data-testid="stDateInput"] input,
-.stTextInput input,
-.stSelectbox select,
-.stDateInput input {{
+/* Style all form inputs */
+input, select, textarea {{
+  background-color: #FFFFFF !important;  /* White background for inputs */
+  color: #000000 !important;             /* Black text in inputs */
+  border: 1px solid #D1D5DB !important;  /* Gray border */
+  border-radius: 10px !important;        /* Rounded corners */
+}}
+
+/* Style all form labels */
+label, .stSelectbox label, .stDateInput label, .stTextInput label {{ 
+  color: #000000 !important;           /* Black text for labels */
+}}
+
+/* Override dark mode form styles */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {{
   background-color: #FFFFFF !important;
   color: #000000 !important;
   border: 1px solid #D1D5DB !important;
-  border-radius: 10px !important;
 }}
 
-/* Style all form labels - force dark text */
-label, 
-.stSelectbox label, 
-.stDateInput label, 
-.stTextInput label,
-[data-testid="stSelectbox"] label,
-[data-testid="stDateInput"] label,
-[data-testid="stTextInput"] label {{
+[data-theme="dark"] label,
+[data-theme="dark"] .stSelectbox label,
+[data-theme="dark"] .stDateInput label,
+[data-theme="dark"] .stTextInput label {{ 
   color: #000000 !important;
+}}
+
+/* ================================= */
+/* TABLE STYLING - AGGRESSIVE APPROACH */
+/* ================================= */
+
+/* ATTEMPT 1: Target main dataframe container */
+[data-testid="stDataFrame"] {{
+    background-color: #FFFFFF !important;  /* Force white background */
+    color: #000000 !important;             /* Force black text */
+}}
+
+/* ATTEMPT 2: Target ALL children of dataframe */
+[data-testid="stDataFrame"] * {{
+    color: #000000 !important;             /* Force ALL child elements to black text */
+    background-color: transparent !important; /* Transparent background for children */
+}}
+
+/* Override dark mode dataframe styles */
+[data-theme="dark"] [data-testid="stDataFrame"],
+[data-theme="dark"] [data-testid="stDataFrame"] * {{
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+}}
+
+/* ATTEMPT 3: Target specific table cell types */
+[data-testid="stDataFrame"] div[role="cell"] {{
+  background-color: #FFFFFF !important;    /* White background for cells */
+  color: #000000 !important;               /* BLACK text for cells */
+  border: 1px solid #CCCCCC !important;    /* Gray border to see cell boundaries */
+  padding: 8px !important;                 /* Padding inside cells */
+}}
+
+/* ATTEMPT 4: Target column headers specifically */
+[data-testid="stDataFrame"] div[role="columnheader"] {{
+  background-color: #F8F9FA !important;    /* Light gray background for headers */
+  color: #000000 !important;               /* BLACK text for headers */
+  font-weight: bold !important;            /* Bold header text */
+  border: 1px solid #CCCCCC !important;    /* Gray border */
+  padding: 8px !important;                 /* Padding inside headers */
+}}
+
+/* ATTEMPT 5: Target grid cells */
+[data-testid="stDataFrame"] div[role="gridcell"] {{
+  background-color: #FFFFFF !important;    /* White background */
+  color: #000000 !important;               /* BLACK text */
+  border: 1px solid #CCCCCC !important;    /* Gray border */
+  padding: 8px !important;                 /* Padding */
+}}
+
+/* ATTEMPT 6: Target any div inside table cells */
+[data-testid="stDataFrame"] div[role="cell"] div {{
+    color: #000000 !important;             /* Force black text on cell divs */
+}}
+
+[data-testid="stDataFrame"] div[role="columnheader"] div {{
+    color: #000000 !important;             /* Force black text on header divs */
+}}
+
+[data-testid="stDataFrame"] div[role="gridcell"] div {{
+    color: #000000 !important;             /* Force black text on gridcell divs */
+}}
+
+/* ATTEMPT 7: Target spans inside cells */
+[data-testid="stDataFrame"] span {{
+    color: #000000 !important;             /* Force black text on spans */
+}}
+
+/* ATTEMPT 8: Alternative dataframe selectors */
+.stDataFrame {{
+    color: #000000 !important;             /* Black text for stDataFrame class */
+}}
+
+.stDataFrame * {{
+    color: #000000 !important;             /* Black text for all children */
+}}
+
+/* ATTEMPT 9: Use CSS pseudo-selectors */
+[data-testid="stDataFrame"] *:not(button):not(input) {{
+    color: #000000 !important;             /* Black text except buttons and inputs */
+}}
+
+/* ATTEMPT 10: Nuclear option - override any text color */
+div[data-testid="stDataFrame"] {{
+    color: #000000 !important;
+}}
+
+div[data-testid="stDataFrame"] > * {{
+    color: #000000 !important;
+}}
+
+div[data-testid="stDataFrame"] > * > * {{
+    color: #000000 !important;
+}}
+
+div[data-testid="stDataFrame"] > * > * > * {{
+    color: #000000 !important;
+}}
+
+/* ================================= */
+/* ALTERNATIVE TABLE STYLING */
+/* ================================= */
+
+/* Style regular HTML tables if Streamlit falls back to them */
+table {{
+    background-color: #FFFFFF !important;  /* White table background */
+    color: #000000 !important;             /* Black table text */
+    border-collapse: collapse !important;   /* Merge borders */
+}}
+
+table td, table th {{
+    background-color: #FFFFFF !important;  /* White cell background */
+    color: #000000 !important;             /* BLACK cell text */
+    border: 1px solid #CCCCCC !important;  /* Gray cell borders */
+    padding: 8px !important;               /* Cell padding */
 }}
 
 /* ================================= */
@@ -249,117 +374,92 @@ label,
     color: #000000 !important;
 }}
 
-/* ================================= */
-/* TABLE STYLING - AGGRESSIVE OVERRIDE */
-/* ================================= */
-
-/* Force all dataframes to light theme */
-[data-testid="stDataFrame"],
-[data-testid="stDataFrame"] *,
-.dataframe,
-.dataframe * {{
+/* Override dark mode sidebar */
+[data-theme="dark"] .css-1d391kg,
+[data-theme="dark"] .css-1lcbmhc,
+[data-theme="dark"] [data-testid="stSidebar"],
+[data-theme="dark"] .stSidebar {{
     background-color: #FFFFFF !important;
     color: #000000 !important;
 }}
 
-/* Override any dark theme table styles */
-[data-testid="stDataFrame"][data-theme="dark"],
-[data-testid="stDataFrame"][data-theme="dark"] * {{
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
-}}
-
-table, table td, table th {{
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
-    border: 1px solid #CCCCCC !important;
-    padding: 8px !important;
-}}
-
 /* ================================= */
-/* METRIC AND STATUS ELEMENTS */
+/* TEXT ELEMENTS - CAREFUL WITH BUTTONS */
 /* ================================= */
 
-/* Override metric widgets */
-[data-testid="metric-container"],
-[data-testid="metric-container"] * {{
-    background-color: #FFFFFF !important;
+/* Force text elements to dark text, but exclude buttons */
+h1:not(button), h2:not(button), h3:not(button), h4:not(button), h5:not(button), h6:not(button), 
+p:not(button), span:not(button), div:not(button):not([data-testid*="stButton"]) {{
     color: #000000 !important;
 }}
 
-/* Override status elements */
-.stSuccess, .stError, .stWarning, .stInfo {{
+/* Override markdown text but not buttons */
+.stMarkdown *:not(button) {{
     color: #000000 !important;
 }}
 
 /* ================================= */
-/* TEXT ELEMENTS */
+/* TEXT WRAPPING */
 /* ================================= */
 
-/* Force all text elements to dark text */
-h1, h2, h3, h4, h5, h6, p, span, div {{
-    color: #000000 !important;
-}}
-
-/* Override markdown text */
-.stMarkdown, .stMarkdown * {{
-    color: #000000 !important;
-}}
-
-/* Override code blocks */
-.stCode, .stCode * {{
-    background-color: #F8F9FA !important;
-    color: #000000 !important;
-}}
-
-/* ================================= */
-/* FINAL NUCLEAR OPTION */
-/* ================================= */
-
-/* If all else fails, force everything to light theme */
-[data-theme="dark"] {{
-    filter: invert(0) !important;
-}}
-
-body[data-theme="dark"] {{
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
+/* Ensure text wraps properly in all table cells */
+[data-testid="stDataFrame"] div[role="cell"],
+[data-testid="stDataFrame"] div[role="columnheader"],
+[data-testid="stDataFrame"] div[role="gridcell"] {{
+  white-space: pre-wrap !important;        /* Preserve line breaks and wrap */
+  word-wrap: break-word !important;        /* Break long words */
+  overflow-wrap: anywhere !important;      /* Allow breaking anywhere */
+  line-height: 1.4 !important;             /* Readable line spacing */
+  max-width: none !important;              /* No width restrictions */
+  height: auto !important;                 /* Auto height */
+  min-height: 40px !important;             /* Minimum cell height */
+  vertical-align: top !important;          /* Align content to top */
+  overflow: visible !important;            /* Show all content */
 }}
 </style>
 
 <script>
-// JavaScript to force light mode
-(function() {{
-    // Remove any dark theme attributes
-    function forceLightMode() {{
-        document.documentElement.removeAttribute('data-theme');
-        document.body.removeAttribute('data-theme');
-        document.documentElement.setAttribute('data-theme', 'light');
+/* ================================= */
+/* JAVASCRIPT BACKUP APPROACH */
+/* ================================= */
+
+/* If CSS fails, use JavaScript to force black text but preserve button colors */
+setTimeout(function() {{
+    /* Find all dataframe elements */
+    var dataframes = document.querySelectorAll('[data-testid="stDataFrame"]');
+    
+    /* Loop through each dataframe */
+    dataframes.forEach(function(df) {{
+        /* Set black text on the container */
+        df.style.color = '#000000';
+        df.style.backgroundColor = '#FFFFFF';
         
-        // Find and update any dark theme elements
-        const darkElements = document.querySelectorAll('[data-theme="dark"]');
-        darkElements.forEach(el => {{
-            el.setAttribute('data-theme', 'light');
+        /* Find all child elements and force black text */
+        var allChildren = df.querySelectorAll('*');
+        allChildren.forEach(function(child) {{
+            child.style.color = '#000000';
+            /* Don't override button backgrounds */
+            if (!child.matches('button')) {{
+                child.style.backgroundColor = 'transparent';
+            }}
         }});
-        
-        // Force light color scheme
-        document.documentElement.style.setProperty('color-scheme', 'light');
-    }}
-    
-    // Run on page load
-    forceLightMode();
-    
-    // Run periodically to catch dynamic changes
-    setInterval(forceLightMode, 1000);
-    
-    // Run when DOM changes
-    const observer = new MutationObserver(forceLightMode);
-    observer.observe(document.body, {{
-        attributes: true,
-        childList: true,
-        subtree: true
     }});
-}})();
+    
+    /* Force light theme detection override */
+    document.documentElement.removeAttribute('data-theme');
+    document.body.removeAttribute('data-theme');
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.documentElement.style.setProperty('color-scheme', 'light');
+    
+    /* Log to console for debugging */
+    console.log('Applied light theme override to', dataframes.length, 'dataframes');
+}}, 1000); /* Wait 1 second for page to load */
+
+/* Continuously enforce light theme */
+setInterval(function() {{
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.documentElement.style.setProperty('color-scheme', 'light');
+}}, 5000);
 </script>
 """, unsafe_allow_html=True)
 
