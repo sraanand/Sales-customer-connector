@@ -20,6 +20,7 @@ HUBSPOT_TOKEN     = os.getenv("HUBSPOT_TOKEN", "")
 AIRCALL_ID        = os.getenv("AIRCALL_ID")
 AIRCALL_TOKEN     = os.getenv("AIRCALL_TOKEN")
 AIRCALL_NUMBER_ID = os.getenv("AIRCALL_NUMBER_ID")
+AIRCALL_NUMBER_ID_2 = os.getenv("AIRCALL_NUMBER_ID_2")
 OPENAI_API_KEY    = os.getenv("OPENAI_API_KEY")
 
 # Deployment timestamp
