@@ -98,6 +98,25 @@ PRIMARY = "#4436F5"
 
 st.markdown(f"""
 <style>
+
+/* ================================= */
+/* MINIMAL DARK MODE OVERRIDE ONLY */
+/* ================================= */
+
+/* Override system dark mode detection */
+:root {{
+    color-scheme: light !important;
+}}
+
+[data-theme="dark"] {{
+    color-scheme: light !important;
+}}
+
+.stApp[data-theme="dark"] {{
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+}}
+
 /* ================================= */
 /* GLOBAL PAGE STYLING */
 /* ================================= */
