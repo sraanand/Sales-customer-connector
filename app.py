@@ -1342,7 +1342,7 @@ def dedupe_users(df: pd.DataFrame, *, use_conducted: bool) -> pd.DataFrame:
             "VideoURLs": "; ".join(unique_video_urls) if unique_video_urls else ""
         })
     out = pd.DataFrame(rows)
-    want = ["CustomerName","Phone","Email","DealsCount","Cars","WhenExact","WhenRel","DealStages","StageHint"]
+    want = ["CustomerName","Phone","Email","DealsCount","Cars","WhenExact","WhenRel","DealStages","StageHint","VideoURLs"]
     return out[want] if not out.empty else out
 
 def build_pairs_text(cars: str, when_rel: str) -> str:
@@ -1850,6 +1850,7 @@ def view_reminders():
             ("hs_object_id","Deal ID"), ("appointment_id","Appointment ID"), ("full_name","Customer"), ("email","Email"), ("phone_norm","Phone"),
             ("vehicle_make","Make"), ("vehicle_model","Model"),
             ("slot_date_prop","TD booking date"), ("slot_time_param","Time"),
+            ("video_url__short_","Video URL"), 
             ("Stage","Stage"),
         ])
 
@@ -1858,7 +1859,7 @@ def view_reminders():
 
     if isinstance(dedup, pd.DataFrame) and not dedup.empty:
         st.markdown("#### <span style='color:#000000;'>Deduped list (by mobile|email)</span>", unsafe_allow_html=True)
-        st.dataframe(dedup[["CustomerName","Phone","Email","DealsCount","Cars","WhenExact","DealStages"]]
+        st.dataframe(dedup[["CustomerName","Phone","Email","DealsCount","Cars","WhenExact","DealStages","VideoURLs"]]
                      .rename(columns={"WhenExact":"When (exact)","DealStages":"Stage(s)"}),
                      use_container_width=True)
 
