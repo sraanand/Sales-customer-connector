@@ -1200,7 +1200,7 @@ def _call_openai(messages):
         pass
     return ""
 
-def draft_sms_reminder(name: str, pairs_text: str) -> str:
+def draft_sms_reminder(name: str, pairs_text: str, video_urls: str = "") -> str:
     system = (
         "You write outbound SMS for Cars24 Laverton (Australia). "
         "Tone: warm, polite, inviting, Australian. AU spelling. "
