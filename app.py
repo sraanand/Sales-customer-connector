@@ -1301,7 +1301,7 @@ def dedupe_users(df: pd.DataFrame, *, use_conducted: bool) -> pd.DataFrame:
         name  = first_nonempty_str(grp["full_name"])
         phone = first_nonempty_str(grp["phone_norm"])
         email = first_nonempty_str(grp["email"])
-        cars_list, when_exact_list, when_rel_list, stages_list = [], [], [], []
+        cars_list, when_exact_list, when_rel_list, stages_list, video_urls_list = [], [], [], [], []
         for _, r in grp.iterrows():
             car = f"{str(r.get('vehicle_make') or '').strip()} {str(r.get('vehicle_model') or '').strip()}".strip() or "car"
             if use_conducted:
