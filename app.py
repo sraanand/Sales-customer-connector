@@ -75,10 +75,10 @@ DEAL_PROPS = [
     "appointment_id",
     "td_booking_slot", "td_booking_slot_date", "td_booking_slot_time",
     "td_conducted_date",
-    "vehicle_make", "vehicle_model",
+    "vehicle_make", "vehicle_model", "vehicle_year", "vehicle_colour", "vehicle_url",  
     "car_location_at_time_of_sale",
     "video_url__short_", 
-    "td_reminder_sms_sent",  # ADD THIS LINE
+    "td_reminder_sms_sent",
 ]
 
 STAGE_LABELS = {
@@ -434,6 +434,51 @@ def force_light_theme():
     };
     </script>
     """, unsafe_allow_html=True)
+def simplify_vehicle_color(color_name: str) -> str:
+    """Simplify complex manufacturer color names to basic colors for SMS messages"""
+    if not color_name or pd.isna(color_name):
+        return ""
+    
+    color = str(color_name).lower().strip()
+    
+    # Red variations
+    if any(word in color for word in ['red', 'crimson', 'scarlet', 'burgundy', 'ruby', 'cherry', 'rose']):
+        return "Red"
+    # Blue variations  
+    if any(word in color for word in ['blue', 'navy', 'azure', 'cobalt', 'sapphire', 'indigo', 'teal']):
+        return "Blue"
+    # White variations
+    if any(word in color for word in ['white', 'pearl', 'ivory', 'cream', 'snow', 'frost']):
+        return "White"
+    # Black variations
+    if any(word in color for word in ['black', 'ebony', 'coal', 'charcoal', 'onyx', 'midnight']):
+        return "Black"
+    # Silver/Grey variations
+    if any(word in color for word in ['silver', 'grey', 'gray', 'platinum', 'steel', 'graphite', 'titanium']):
+        return "Silver"
+    # Green variations
+    if any(word in color for word in ['green', 'emerald', 'forest', 'sage', 'olive', 'lime']):
+        return "Green"
+    # Yellow/Gold variations
+    if any(word in color for word in ['yellow', 'gold', 'amber', 'champagne', 'bronze']):
+        return "Gold"
+    # Orange variations
+    if any(word in color for word in ['orange', 'copper', 'sunset', 'rust']):
+        return "Orange"
+    # Purple variations
+    if any(word in color for word in ['purple', 'violet', 'magenta', 'plum']):
+        return "Purple"
+    # Brown variations
+    if any(word in color for word in ['brown', 'tan', 'beige', 'mocha', 'coffee', 'chocolate']):
+        return "Brown"
+    
+    # If no match found, try to extract the first recognizable color word
+    color_words = color.split()
+    for word in color_words:
+        if word in ['red', 'blue', 'white', 'black', 'silver', 'green', 'yellow', 'orange', 'purple', 'brown']:
+            return word.capitalize()
+    
+    return ""
 
 def parse_td_slot_time_prop(val) -> str:
     """Parse HubSpot 'td_booking_slot_time' -> 'HH:MM' local if epoch, or normalize common strings."""
@@ -1391,11 +1436,51 @@ def draft_sms_oldlead_by_stage(name: str, car_text: str, stage_hint: str) -> str
     if text.strip().lower().startswith(intro): return text.strip()
     return f"{text.strip()} –Pawan, Sales Manager"
 
+def draft_sms_oldlead_by_stage_improved(name: str, vehicle_details: list, stage_hint: str) -> str:
+    """Generate improved SMS for old leads with vehicle details and stage-specific messaging"""
+    first = (name or "").split()[0] if (name or "").strip() else "there"
+    
+    # Use first vehicle for primary messaging
+    primary_vehicle = vehicle_details[0] if vehicle_details else {}
+    make = primary_vehicle.get('make', '')
+    model = primary_vehicle.get('model', '')
+    year = primary_vehicle.get('year', '')
+    color = primary_vehicle.get('color', '')
+    url = primary_vehicle.get('url', '')
+    stage_id = primary_vehicle.get('stage_id', '')
+    
+    # Build vehicle description
+    vehicle_desc = []
+    if year: vehicle_desc.append(year)
+    if color: vehicle_desc.append(color)
+    if make: vehicle_desc.append(make)
+    if model: vehicle_desc.append(model)
+    
+    vehicle_text = " ".join(vehicle_desc) if vehicle_desc else "the vehicle"
+    
+    # Stage-specific messaging based on stage IDs
+    if stage_id == "1119198251" or stage_hint == "enquiry":  # Enquiry stage
+        stage_specific = "Are you still looking for a car? I would love to meet you in person when you are on site for a test drive."
+    elif stage_id == "1119198252" or stage_hint == "booked":  # TD Booked stage  
+        stage_specific = "I encourage you to drive down to Laverton - the drive would definitely be worth it! Has there been any change of plans?"
+    elif stage_id == "1119198253" or stage_hint == "conducted":  # TD Conducted stage
+        stage_specific = "Is there anything I could do differently to make this work for you?"
+    else:
+        stage_specific = "Are you still in the market for a vehicle? I am here to help find the perfect deal."
+    
+    # Include URL if available
+    vehicle_url_text = f" {url}" if url else ""
+    
+    # Build the message
+    text = f"Hi {first}, this is Pawan, Sales Manager at Cars24 Laverton. Regarding the {vehicle_text}{vehicle_url_text} - {stage_specific} Please let me know. –Pawan"
+    
+    return text
+
 # ============ Dedupe & SMS build ============
 def dedupe_users(df: pd.DataFrame, *, use_conducted: bool) -> pd.DataFrame:
-    """Return rows with: CustomerName, Phone, Email, DealsCount, Cars, WhenExact, WhenRel, DealStages, StageHint."""
+    """Return rows with: CustomerName, Phone, Email, DealsCount, Cars, WhenExact, WhenRel, DealStages, StageHint, VehicleDetails."""
     if df is None or df.empty:
-        return pd.DataFrame(columns=["CustomerName","Phone","Email","DealsCount","Cars","WhenExact","WhenRel","DealStages","StageHint"])
+        return pd.DataFrame(columns=["CustomerName","Phone","Email","DealsCount","Cars","WhenExact","WhenRel","DealStages","StageHint","VehicleDetails"])
     work = df.copy()
     work["email_l"] = work["email"].astype(str).str.strip().str.lower()
     work["user_key"] = (work["phone_norm"].fillna('') + "|" + work["email_l"].fillna('')).str.strip()
@@ -1406,8 +1491,30 @@ def dedupe_users(df: pd.DataFrame, *, use_conducted: bool) -> pd.DataFrame:
         phone = first_nonempty_str(grp["phone_norm"])
         email = first_nonempty_str(grp["email"])
         cars_list, when_exact_list, when_rel_list, stages_list, video_urls_list = [], [], [], [], []
+        vehicle_details_list = []  # NEW: Store detailed vehicle info
+        
         for _, r in grp.iterrows():
+            # Build basic car description
             car = f"{str(r.get('vehicle_make') or '').strip()} {str(r.get('vehicle_model') or '').strip()}".strip() or "car"
+            
+            # NEW: Build detailed vehicle info for messaging
+            vehicle_year = str(r.get('vehicle_year') or '').strip()
+            vehicle_colour = str(r.get('vehicle_colour') or '').strip()
+            vehicle_url = str(r.get('vehicle_url') or '').strip()
+            simplified_color = simplify_vehicle_color(vehicle_colour)
+            stage_id = str(r.get('dealstage') or '').strip()
+            
+            # Store detailed vehicle info as dict
+            vehicle_detail = {
+                'make': str(r.get('vehicle_make') or '').strip(),
+                'model': str(r.get('vehicle_model') or '').strip(), 
+                'year': vehicle_year,
+                'color': simplified_color,
+                'url': vehicle_url,
+                'stage_id': stage_id
+            }
+            vehicle_details_list.append(vehicle_detail)
+            
             if use_conducted:
                 d = r.get("conducted_date_local"); t = r.get("conducted_time_local") or ""
             else:
@@ -1443,10 +1550,11 @@ def dedupe_users(df: pd.DataFrame, *, use_conducted: bool) -> pd.DataFrame:
             "WhenRel": "; ".join([w for w in when_rel_list if w]),
             "DealStages": "; ".join(stage_labels) if stage_labels else "",
             "StageHint": hint,
-            "VideoURLs": "; ".join(unique_video_urls) if unique_video_urls else ""
+            "VideoURLs": "; ".join(unique_video_urls) if unique_video_urls else "",
+            "VehicleDetails": vehicle_details_list  # NEW: Detailed vehicle info
         })
     out = pd.DataFrame(rows)
-    want = ["CustomerName","Phone","Email","DealsCount","Cars","WhenExact","WhenRel","DealStages","StageHint","VideoURLs"]
+    want = ["CustomerName","Phone","Email","DealsCount","Cars","WhenExact","WhenRel","DealStages","StageHint","VideoURLs","VehicleDetails"]
     return out[want] if not out.empty else out
 
 def build_pairs_text(cars: str, when_rel: str) -> str:
@@ -1469,16 +1577,25 @@ def build_messages_from_dedup(dedup_df: pd.DataFrame, mode: str) -> pd.DataFrame
         name  = str(row.get("CustomerName") or "").strip()
         cars  = str(row.get("Cars") or "").strip()
         when_rel = str(row.get("WhenRel") or "").strip()
-        video_urls = str(row.get("VideoURLs") or "").strip()  # GET VIDEO URLS
+        video_urls = str(row.get("VideoURLs") or "").strip()
+        vehicle_details = row.get("VehicleDetails", [])  # NEW: Get vehicle details
+        
         pairs_text = build_pairs_text(cars, when_rel)
+        
         if mode == "reminder":
             msg = draft_sms_reminder(name, pairs_text, video_urls)
         elif mode == "manager":
             msg = draft_sms_manager(name, pairs_text)
+        elif mode == "oldlead":
+            # Use improved old lead messaging
+            stage_hint = str(row.get("StageHint") or "unknown")
+            msg = draft_sms_oldlead_by_stage_improved(name, vehicle_details, stage_hint)
         else:
+            # Fallback to original for other modes
             car_text = cars or "the car you were eyeing"
             stage_hint = str(row.get("StageHint") or "unknown")
             msg = draft_sms_oldlead_by_stage(name, car_text, stage_hint)
+            
         out.append({"CustomerName": name, "Phone": phone, "Email": str(row.get("Email") or "").strip(),
                     "Cars": cars, "WhenExact": str(row.get("WhenExact") or ""), "WhenRel": when_rel,
                     "DealStages": str(row.get("DealStages") or ""), "Message": msg})
