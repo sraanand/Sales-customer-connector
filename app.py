@@ -1419,7 +1419,7 @@ def draft_sms_oldlead_by_stage(name: str, car_text: str, stage_hint: str) -> str
         "You write outbound SMS for Cars24 Laverton (Australia) from the store manager, Pawan. "
         "Tone: warm, courteous, Australian; avoid pressure; encourage a reply. "
         "Promise personal attention and that we will work out a deal they will love. "
-        "Keep ~300 characters. No emojis/links. Avoid apostrophes."
+        "Keep ~400 characters. No emojis/links. Avoid apostrophes."
     )
     user = (
         f"Recipient name: {name or 'there'}.\n"
@@ -1437,7 +1437,7 @@ def draft_sms_oldlead_by_stage(name: str, car_text: str, stage_hint: str) -> str
     return f"{text.strip()} –Pawan, Sales Manager"
 
 def draft_sms_oldlead_by_stage_improved(name: str, vehicle_details: list, stage_hint: str) -> str:
-    """Generate improved SMS for old leads with vehicle details and stage-specific messaging"""
+    """Generate improved SMS for old leads with vehicle details and stage-specific messaging using ChatGPT"""
     first = (name or "").split()[0] if (name or "").strip() else "there"
     
     # Use first vehicle for primary messaging
@@ -1449,32 +1449,70 @@ def draft_sms_oldlead_by_stage_improved(name: str, vehicle_details: list, stage_
     url = primary_vehicle.get('url', '')
     stage_id = primary_vehicle.get('stage_id', '')
     
-    # Build vehicle description
-    vehicle_desc = []
-    if year: vehicle_desc.append(year)
-    if color: vehicle_desc.append(color)
-    if make: vehicle_desc.append(make)
-    if model: vehicle_desc.append(model)
+    # Build vehicle description for ChatGPT
+    vehicle_parts = []
+    if year: vehicle_parts.append(year)
+    if color: vehicle_parts.append(color)
+    if make: vehicle_parts.append(make)
+    if model: vehicle_parts.append(model)
     
-    vehicle_text = " ".join(vehicle_desc) if vehicle_desc else "the vehicle"
+    vehicle_text = " ".join(vehicle_parts) if vehicle_parts else "the vehicle"
     
-    # Stage-specific messaging based on stage IDs
+    # Stage-specific context and messaging based on stage IDs
     if stage_id == "1119198251" or stage_hint == "enquiry":  # Enquiry stage
-        stage_specific = "Are you still looking for a car? I would love to meet you in person when you are on site for a test drive."
+        context = "They enquired but have not booked a test drive yet."
+        ask = "Ask if they are still looking for a car and encourage booking a test drive to meet in person when they are on site."
+        stage_specific_action = "Are you still looking for a car? I would love to meet you in person when you are on site for a test drive."
     elif stage_id == "1119198252" or stage_hint == "booked":  # TD Booked stage  
-        stage_specific = "I encourage you to drive down to Laverton - the drive would definitely be worth it! Has there been any change of plans?"
+        context = "They booked a test drive but did not show up."
+        ask = "Encourage them to drive down to Laverton, mention the drive would be worth it, ask about change of plans."
+        stage_specific_action = "I encourage you to drive down to Laverton - the drive would definitely be worth it! Has there been any change of plans?"
     elif stage_id == "1119198253" or stage_hint == "conducted":  # TD Conducted stage
-        stage_specific = "Is there anything I could do differently to make this work for you?"
+        context = "They completed a test drive but did not proceed with purchase."
+        ask = "Check what could be done differently to make this work for you."
+        stage_specific_action = "Is there anything I could do differently to make this work for you?"
     else:
-        stage_specific = "Are you still in the market for a vehicle? I am here to help find the perfect deal."
+        context = "It has been a while since they reached out."
+        ask = "Re-engage and check current interest."
+        stage_specific_action = "Are you still in the market for a vehicle? I am here to help find the perfect deal."
     
-    # Include URL if available
-    vehicle_url_text = f" {url}" if url else ""
+    # Enhanced system prompt for ChatGPT
+    system = (
+        "You write outbound SMS for Cars24 Laverton (Australia) from the store manager, Pawan. "
+        "Tone: warm, courteous, Australian; avoid pressure; encourage a reply. "
+        "Promise personal attention and that we will work out a deal they will love. "
+        "Include the vehicle URL if provided so customer can identify the specific car. "
+        "Keep ~300 characters if no URL, or ~400 characters if URL included. "
+        "No emojis/links except the provided vehicle URL. Avoid apostrophes."
+    )
     
-    # Build the message
-    text = f"Hi {first}, this is Pawan, Sales Manager at Cars24 Laverton. Regarding the {vehicle_text}{vehicle_url_text} - {stage_specific} Please let me know. –Pawan"
+    # Enhanced user prompt with vehicle details
+    user = (
+        f"Recipient name: {name or 'there'}.\n"
+        f"Vehicle of interest: {vehicle_text}\n"
+        f"Vehicle URL (include if provided): {url}\n"
+        f"Stage context: {context}\n"
+        f"Suggested stage-specific action: {stage_specific_action}\n"
+        f"Begin the SMS with exactly: Hi {first}, this is Pawan, Sales Manager at Cars24 Laverton.\n"
+        f"{ask} Include the vehicle URL in the message if provided. Make it friendly and concise."
+    )
     
-    return text
+    # Call ChatGPT
+    text = _call_openai([
+        {"role": "system", "content": system},
+        {"role": "user", "content": user}
+    ]) or ""
+    
+    # Fallback if ChatGPT fails
+    if not text.strip():
+        vehicle_url_text = f" {url}" if url else ""
+        text = f"Hi {first}, this is Pawan, Sales Manager at Cars24 Laverton. Hope you are well! Regarding the {vehicle_text}{vehicle_url_text} - {stage_specific_action} Please let me know. Thanks!"
+    
+    # Ensure proper ending format
+    intro = f"hi {first.lower()}, this is pawan, sales manager at cars24 laverton"
+    if text.strip().lower().startswith(intro): 
+        return text.strip()
+    return f"{text.strip()} –Pawan, Sales Manager"
 
 # ============ Dedupe & SMS build ============
 def dedupe_users(df: pd.DataFrame, *, use_conducted: bool) -> pd.DataFrame:
@@ -2314,24 +2352,47 @@ def view_old():
 
             # Exclude contacts with other ACTIVE purchase deals (existing logic)
             deal_ids = deals.get("hs_object_id", pd.Series(dtype=str)).dropna().astype(str).tolist()
+            print(f"DEBUG: Checking {len(deal_ids)} deals: {deal_ids}")
+            
             d2c = hs_deals_to_contacts_map(deal_ids)
+            print(f"DEBUG: Deal-to-contact mapping: {d2c}")
+            
             contact_ids = sorted({cid for cids in d2c.values() for cid in cids})
+            print(f"DEBUG: Found {len(contact_ids)} contacts: {contact_ids}")
+            
             c2d = hs_contacts_to_deals_map(contact_ids)
+            print(f"DEBUG: Contact-to-deals mapping:")
+            for cid, deal_list in c2d.items():
+                print(f"  Contact {cid}: {deal_list}")
+            
             other_deal_ids = sorted({did for _, dlist in c2d.items() for did in dlist if did not in deal_ids})
+            print(f"DEBUG: Found {len(other_deal_ids)} other deals to check stages")
+            
             stage_map = hs_batch_read_deals(other_deal_ids, props=["dealstage"])
+            print(f"DEBUG: Retrieved stages for {len(stage_map)} deals")
 
             exclude_contacts = set()
             for cid, dlist in c2d.items():
+                active_deals = []
                 for did in dlist:
                     if did in deal_ids: continue
                     stage = (stage_map.get(did, {}) or {}).get("dealstage")
                     if stage and str(stage) in ACTIVE_PURCHASE_STAGE_IDS:
-                        exclude_contacts.add(cid); break
+                        active_deals.append(f"{did}({stage})")
+                        exclude_contacts.add(cid)
+                        
+                if active_deals:
+                    print(f"DEBUG: Excluding contact {cid} - active purchases: {active_deals}")
+
+            print(f"DEBUG: Total contacts to exclude: {len(exclude_contacts)}")
 
             def keep_row(row):
                 d_id = str(row.get("hs_object_id") or "")
                 cids = d2c.get(d_id, [])
-                return not any((c in exclude_contacts) for c in cids)
+                should_exclude = any((c in exclude_contacts) for c in cids)
+                if should_exclude:
+                    print(f"DEBUG: Excluding deal {d_id} - contact(s) {cids} have active purchases")
+                return not should_exclude
 
             kept = deals.copy()
             if not deals.empty:
