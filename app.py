@@ -2310,8 +2310,8 @@ def view_manager():
             # If your function signature differs, keep your original argument list here.
             raw = hs_search_deals_by_date_property(
                 date_property="td_conducted_date",
-                start_date=d1,
-                end_date=d2,
+                date_from=d1,
+                date_to=d2,
                 pipeline_id=PIPELINE_ID,
                 state_value=rem_state_val,
             )
@@ -2336,7 +2336,7 @@ def view_manager():
                         if (props or {}).get("dealstage") in ACTIVE_PURCHASE_STAGES
                     )
                     # mark any rows whose contact has an active purchase deal elsewhere
-                    mask_drop = kept["hs_object_id"].astype(str).isin([])  # start as false
+                    mask_drop = pd.Series(False, index=kept.index)  # start as all False
                     if d2c:
                         # any contact whose any other deal is active
                         contact_has_active = {
