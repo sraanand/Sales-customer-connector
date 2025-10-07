@@ -2309,7 +2309,7 @@ def view_manager():
             # Keep your existing search signature; this call mirrors your current usage.
             # If your function signature differs, keep your original argument list here.
             raw = hs_search_deals_by_date_property(
-                date_prop="td_conducted_date",
+                date_property="td_conducted_date",
                 start_date=d1,
                 end_date=d2,
                 pipeline_id=PIPELINE_ID,
