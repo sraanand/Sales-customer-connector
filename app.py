@@ -96,7 +96,7 @@ st.set_page_config(
 # Force light theme regardless of system settings
 st._config.set_option('theme.base', 'light')
 
-PRIMARY = "#4436F5"
+PRIMARY = "#4736FE"
 
 st.markdown(f"""
 <style>
@@ -631,6 +631,48 @@ def update_deals_sms_sent(deal_ids: list[str]) -> tuple[int, int]:
             st.warning(f"Error updating deals: {str(e)}")
     
     return success_count, failure_count
+
+def update_deals_manager_followup_sms_sent(deal_ids: list[str]) -> tuple[int, int]:
+    '''
+    Update the manager_followup_sms_sent property to 'true' for the given deal IDs.
+    Returns (success_count, failure_count)
+    '''
+    if not deal_ids:
+        return 0, 0
+
+    success_count = 0
+    failure_count = 0
+
+    url = f"{HS_ROOT}/crm/v3/objects/deals/batch/update"
+
+    # Process in batches of 100 (HubSpot limit)
+    for i in range(0, len(deal_ids), 100):
+        batch = deal_ids[i:i+100]
+
+        inputs = []
+        for deal_id in batch:
+            inputs.append({
+                "id": str(deal_id),
+                "properties": {
+                    "manager_followup_sms_sent": "true"
+                }
+            })
+
+        payload = {"inputs": inputs}
+
+        try:
+            response = requests.post(url, headers=hs_headers(), json=payload, timeout=25)
+            if response.status_code == 200:
+                success_count += len(batch)
+            else:
+                failure_count += len(batch)
+                st.warning(f"Failed to update batch: {response.text[:200]}")
+        except Exception as e:
+            failure_count += len(batch)
+            st.warning(f"Error updating deals: {str(e)}")
+
+    return success_count, failure_count
+
 
 def get_all_deal_ids_for_contacts(messages_df: pd.DataFrame, deals_df: pd.DataFrame) -> dict[str, list[str]]:
     """
@@ -2279,6 +2321,9 @@ def view_manager():
         st.session_state["manager_dedupe_dropped"] = dedupe_dropped
         st.session_state["manager_msgs"]  = msgs
         st.session_state["manager_skipped_msgs"] = skipped_msgs
+        # Store phone-to-deals mapping for later update
+        st.session_state["manager_phone_to_deals"] = get_all_deal_ids_for_contacts(msgs, deals_f)
+
 
     deals_f      = st.session_state.get("manager_deals")
     removed_int  = st.session_state.get("manager_removed_internal")
@@ -2323,13 +2368,34 @@ def view_manager():
             else:
                 st.info("Sending messages…")
                 sent, failed = 0, 0
+                sent_phones = []  # Track which phones were sent successfully
                 for _, r in to_send.iterrows():
                     ok, msg = send_sms_via_aircall(r["Phone"], r["SMS draft"], AIRCALL_NUMBER_ID_2)
-                    if ok: sent += 1; st.success(f"✅ Sent to {r['Phone']}")
-                    else:  failed += 1; st.error(f"❌ Failed for {r['Phone']}: {msg}")
+                    if ok:
+                        sent += 1
+                        sent_phones.append(r["Phone"])
+                        st.success(f"✅ Sent to {r['Phone']}")
+                    else:
+                        failed += 1
+                        st.error(f"❌ Failed for {r['Phone']}: {msg}")
                     time.sleep(1)
-                if sent: st.balloons()
-                st.success(f"🎉 Done! Sent: {sent} | Failed: {failed}")
+
+                # Update deals in HubSpot after successful sends
+                if sent_phones and st.session_state.get("manager_phone_to_deals"):
+                    st.info("Updating HubSpot deals...")
+                    phone_to_deals = st.session_state["manager_phone_to_deals"]
+
+                    all_deal_ids = []
+                    for phone in sent_phones:
+                        if phone in phone_to_deals:
+                            all_deal_ids.extend(phone_to_deals[phone])
+
+                    if all_deal_ids:
+                        update_success, update_fail = update_deals_manager_followup_sms_sent(all_deal_ids)
+                        if update_success > 0:
+                            st.success(f"✅ Updated {update_success} deals with manager follow-up SMS status")
+                        if update_fail > 0:
+                            st.warning(f"⚠️ Failed to update {update_fail} deals")
 
 def view_old():
     st.subheader("🕰️  Old Leads by Appointment ID")
