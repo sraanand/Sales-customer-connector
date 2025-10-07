@@ -2405,19 +2405,19 @@ def view_manager():
             deals_f,
             "Filtered deals (trimmed)",
             [
-                "hs_object_id",
-                "full_name",
-                "email",
-                "phone",
-                "vehicle_year",
-                "vehicle_make",
-                "vehicle_model",
-                "car_location_at_time_of_sale",
-                "td_conducted_date",
-                "manager_followup_sms_sent",
+                ("hs_object_id", "Deal ID"),
+                ("full_name", "Name"),
+                ("email", "Email"),
+                ("phone", "Phone"),
+                ("vehicle_year", "Year"),
+                ("vehicle_make", "Make"),
+                ("vehicle_model", "Model"),
+                ("car_location_at_time_of_sale", "State"),
+                ("td_conducted_date", "TD conducted"),
+                ("manager_followup_sms_sent", "Manager SMS sent"),
             ],
         )
-
+        
     # ===== Messages table / send flow =====
     msgs = st.session_state.get("manager_msgs")
     skipped_msgs = st.session_state.get("manager_skipped_msgs")
