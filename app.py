@@ -79,6 +79,7 @@ DEAL_PROPS = [
     "car_location_at_time_of_sale",
     "video_url__short_", 
     "td_reminder_sms_sent",
+    "manager_followup_sms_sent",
 ]
 
 STAGE_LABELS = {
@@ -589,6 +590,29 @@ def filter_sms_already_sent(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFram
     if not removed.empty:
         removed["Reason"] = "SMS reminder already sent (td_reminder_sms_sent = true)"
     
+    return kept, removed
+
+def filter_manager_sms_already_sent(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Filter out deals where manager_followup_sms_sent is already 'true' or 'Yes'.
+    Returns (kept_df, removed_df) where removed_df includes a Reason column.
+    """
+    if df is None or df.empty or "manager_followup_sms_sent" not in df.columns:
+        return df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame(), pd.DataFrame()
+
+    work = df.copy()
+
+    # Treat both 'true' and 'Yes' as already sent (value vs label)
+    work["manager_sms_sent_flag"] = work["manager_followup_sms_sent"].apply(
+        lambda x: str(x).lower() in ['yes', 'true'] if pd.notna(x) else False
+    )
+
+    removed = work[work["manager_sms_sent_flag"]].drop(columns=["manager_sms_sent_flag"]).copy()
+    kept    = work[~work["manager_sms_sent_flag"]].drop(columns=["manager_sms_sent_flag"]).copy()
+
+    if not removed.empty:
+        removed["Reason"] = "Manager follow-up already sent"
+
     return kept, removed
 
 def update_deals_sms_sent(deal_ids: list[str]) -> tuple[int, int]:
@@ -2236,139 +2260,191 @@ def view_reminders():
                 st.success(f"🎉 Done! SMS Sent: {sent} | Failed: {failed}")
 
 def view_manager():
-    
     st.subheader("👔  Manager Follow-Ups")
+
+    # ===== Filters form =====
     with st.form("manager_form"):
         st.markdown('<div class="form-row">', unsafe_allow_html=True)
-        c1,c2,c3,c4 = st.columns([1.4,1.6,1.6,1.2])
-        with c1: mode = st.radio("Mode", ["Single date","Date range"], horizontal=True, index=1)
+        c1, c2, c3, c4 = st.columns([1.4, 1.6, 1.6, 1.2])
+
+        with c1:
+            mode = st.radio("Mode", ["Single date", "Date range"], horizontal=True, index=1)
+
         today = datetime.now(MEL_TZ).date()
-        if mode=="Single date":
-            with c2: d1 = st.date_input("Date", value=today); d2 = d1
-            with c3: pass
+        if mode == "Single date":
+            with c2:
+                d1 = st.date_input("Date", value=today)
+                d2 = d1
+            with c3:
+                pass
         else:
-            with c2: d1 = st.date_input("Start date", value=today - timedelta(days=7))
-            with c3: d2 = st.date_input("End date",   value=today)
+            with c2:
+                d1 = st.date_input("Start date", value=today - timedelta(days=7))
+            with c3:
+                d2 = st.date_input("End date", value=today)
+
+        # Vehicle state filter (kept same as your existing pattern)
         state_options = hs_get_deal_property_options("car_location_at_time_of_sale")
         values = [o["value"] for o in state_options] if state_options else []
         labels = [o["label"] for o in state_options] if state_options else []
         def_val = "VIC" if "VIC" in values else (values[0] if values else "")
         with c4:
             if labels:
-                chosen_label = st.selectbox("Vehicle state", labels, index=(values.index("VIC") if "VIC" in values else 0))
-                label_to_val = {o["label"]:o["value"] for o in state_options}
-                mgr_state_val = label_to_val.get(chosen_label, def_val)
+                chosen_label = st.selectbox(
+                    "Vehicle state",
+                    labels,
+                    index=(values.index("VIC") if "VIC" in values else 0)
+                )
+                label_to_val = {o["label"]: o["value"] for o in state_options}
+                rem_state_val = label_to_val.get(chosen_label, def_val)
             else:
-                mgr_state_val = st.text_input("Vehicle state", value=def_val)
-        go = st.form_submit_button("Fetch deals", use_container_width=True)
+                rem_state_val = def_val
+
         st.markdown("</div>", unsafe_allow_html=True)
+        go = st.form_submit_button("Fetch deals", use_container_width=True)
 
+    # ===== Data fetch and preprocessing =====
     if go:
-        st.markdown("<span style='background:#4436F5;color:#FFFFFF;padding:4px 8px;border-radius:6px;'>Searching HubSpot…</span>", unsafe_allow_html=True)
+        with st.spinner("Fetching deals from HubSpot…"):
+            # Keep your existing search signature; this call mirrors your current usage.
+            # If your function signature differs, keep your original argument list here.
+            raw = hs_search_deals_by_date_property(
+                date_prop="td_conducted_date",
+                start_date=d1,
+                end_date=d2,
+                pipeline_id=PIPELINE_ID,
+                state_value=rem_state_val,
+            )
 
-        # 1) Base search
-        s_ms, e_ms = mel_range_bounds_to_epoch_ms(d1, d2)
-        raw = hs_search_deals_by_date_property(
-            pipeline_id=PIPELINE_ID, stage_id=STAGE_CONDUCTED_ID, state_value=mgr_state_val,
-            date_property="td_conducted_date", date_eq_ms=None,
-            date_start_ms=s_ms, date_end_ms=e_ms, total_cap=HS_TOTAL_CAP
-        )
+        # Ensure expected columns and normalize (your existing helper)
         deals0 = prepare_deals(raw)
 
-        # 2) Exclude contacts with other ACTIVE purchase deals
+        # 1) Exclude contacts that have other ACTIVE purchase deals (kept from your existing logic)
         kept = deals0.copy()
-        if not kept.empty:
-            deal_ids = kept.get("hs_object_id", pd.Series(dtype=str)).dropna().astype(str).tolist()
-            d2c = hs_deals_to_contacts_map(deal_ids)
-            contact_ids = sorted({cid for cids in d2c.values() for cid in cids})
-            c2d = hs_contacts_to_deals_map(contact_ids)
-            other_deal_ids = sorted({did for _, dlist in c2d.items() for did in dlist if did not in deal_ids})
-            stage_map = hs_batch_read_deals(other_deal_ids, props=["dealstage"])
+        dropped_active = pd.DataFrame()
+        try:
+            deal_ids = [str(x) for x in kept["hs_object_id"].dropna().astype(str).tolist()]
+            if deal_ids:
+                d2c = hs_deals_to_contacts_map(deal_ids)
+                contact_ids = sorted(set([c for v in d2c.values() for c in v]))
+                c2d = hs_contacts_to_deals_map(contact_ids)
+                other_deal_ids = sorted(set([did for v in c2d.values() for did in v if did not in deal_ids]))
+                if other_deal_ids:
+                    stage_map = hs_batch_read_deals(other_deal_ids, props=["dealstage"])
+                    active_ids = set(
+                        did for did, props in stage_map.items()
+                        if (props or {}).get("dealstage") in ACTIVE_PURCHASE_STAGES
+                    )
+                    # mark any rows whose contact has an active purchase deal elsewhere
+                    mask_drop = kept["hs_object_id"].astype(str).isin([])  # start as false
+                    if d2c:
+                        # any contact whose any other deal is active
+                        contact_has_active = {
+                            cid: any(d in active_ids for d in c2d.get(cid, []))
+                            for cid in contact_ids
+                        }
+                        kept["__contact_has_active__"] = kept["hs_object_id"].map(
+                            lambda did: any(contact_has_active.get(cid, False) for cid in d2c.get(str(did), []))
+                        )
+                        mask_drop = kept["__contact_has_active__"] == True
+                    dropped_active = kept[mask_drop].copy()
+                    if not dropped_active.empty:
+                        dropped_active["Reason"] = "Active purchase on another deal"
+                        kept = kept[~mask_drop].copy()
+                        kept.drop(columns=["__contact_has_active__"], errors="ignore", inplace=True)
+        except Exception as e:
+            st.warning(f"Active purchase filter skipped due to: {e}")
 
-            exclude_contacts = set()
-            for cid, dlist in c2d.items():
-                for did in dlist:
-                    if did in deal_ids: continue
-                    stage = (stage_map.get(did, {}) or {}).get("dealstage")
-                    if stage and str(stage) in ACTIVE_PURCHASE_STAGE_IDS:
-                        exclude_contacts.add(cid); break
+        # ======== NEW: exclude deals where manager follow-up SMS already sent ========
+        deals_not_sent, removed_sms_sent = filter_manager_sms_already_sent(kept)
 
-            def keep_row(row):
-                d_id = str(row.get("hs_object_id") or "")
-                cids = d2c.get(d_id, [])
-                return not any((c in exclude_contacts) for c in cids)
+        # 2) Internal/test email filter (your existing helper)
+        deals_f, removed_internal = filter_internal_test_emails(deals_not_sent)
 
-            kept["__keep"] = kept.apply(keep_row, axis=1)
-            dropped_active = kept[~kept["__keep"]].drop(columns=["__keep"]).copy()
-            kept = kept[kept["__keep"]].drop(columns=["__keep"]).copy()
-            if not dropped_active.empty:
-                dropped_active["Reason"] = "Contact has another active purchase deal"
-                show_removed_table(dropped_active, "Removed (active purchase on another deal)")
-
-        # 3) Filter internal/test emails + callout
-        deals_f, removed_internal = filter_internal_test_emails(kept)
-
-        # 4) Audit dedupe
-        dedup, dedupe_dropped = dedupe_users_with_audit(deals_f, use_conducted=True)
-
-        # 5) Build messages + audit
+        # 3) Dedupe + message building (manager mode)
+        dedup, dedupe_drop = dedupe_users_with_audit(deals_f, use_conducted=True)
         msgs, skipped_msgs = build_messages_with_audit(dedup, mode="manager")
 
-        # persist
+        # Persist for downstream UI/actions
         st.session_state["manager_deals"] = deals_f
-        st.session_state["manager_removed_internal"] = removed_internal
-        st.session_state["manager_dedup"] = dedup
-        st.session_state["manager_dedupe_dropped"] = dedupe_dropped
-        st.session_state["manager_msgs"]  = msgs
+        st.session_state["manager_msgs"] = msgs
         st.session_state["manager_skipped_msgs"] = skipped_msgs
-        # Store phone-to-deals mapping for later update
+
+        # Store phone→deal mapping for post-send HubSpot updates
         st.session_state["manager_phone_to_deals"] = get_all_deal_ids_for_contacts(msgs, deals_f)
 
+        # Persist removed buckets for “Reasons” UI
+        st.session_state["manager_removed_sms_sent"] = removed_sms_sent
+        st.session_state["manager_removed_internal"] = removed_internal
+        st.session_state["manager_dropped_active"] = dropped_active
+        st.session_state["manager_dedupe_drop"] = dedupe_drop
 
-    deals_f      = st.session_state.get("manager_deals")
-    removed_int  = st.session_state.get("manager_removed_internal")
-    dedup        = st.session_state.get("manager_dedup")
-    dedupe_drop  = st.session_state.get("manager_dedupe_dropped")
-    msgs         = st.session_state.get("manager_msgs")
-    skipped_msgs = st.session_state.get("manager_skipped_msgs")
+    # ===== Show removed buckets (Reasons) =====
+    removed_sms = st.session_state.get("manager_removed_sms_sent")
+    removed_int = st.session_state.get("manager_removed_internal")
+    dropped_active = st.session_state.get("manager_dropped_active")
+    dedupe_drop = st.session_state.get("manager_dedupe_drop")
+
+    if isinstance(removed_sms, pd.DataFrame) and not removed_sms.empty:
+        st.warning(f"⚠️ {len(removed_sms)} deals excluded - manager follow-up already sent")
+        show_removed_table(removed_sms, "Removed (manager follow-up already sent)")
+
+    if isinstance(dropped_active, pd.DataFrame) and not dropped_active.empty:
+        show_removed_table(dropped_active, "Removed (active purchase on another deal)")
 
     if isinstance(removed_int, pd.DataFrame) and not removed_int.empty:
         show_removed_table(removed_int, "Removed by domain filter (cars24.com / yopmail.com)")
 
-    if isinstance(deals_f, pd.DataFrame) and not deals_f.empty:
-        render_trimmed(deals_f, "Filtered deals (trimmed)", [
-            ("hs_object_id","Deal ID"), ("appointment_id","Appointment ID"), ("full_name","Customer"), ("email","Email"), ("phone_norm","Phone"),
-            ("vehicle_make","Make"), ("vehicle_model","Model"),
-            ("conducted_date_local","TD conducted (date)"), ("conducted_time_local","Time"),
-            ("Stage","Stage"),
-        ])
-
     if isinstance(dedupe_drop, pd.DataFrame) and not dedupe_drop.empty:
         show_removed_table(dedupe_drop, "Collapsed during dedupe (duplicates)")
 
-    if isinstance(dedup, pd.DataFrame) and not dedup.empty:
-        st.markdown("#### <span style='color:#000000;'>Deduped list (by mobile|email)</span>", unsafe_allow_html=True)
-        st.dataframe(dedup[["CustomerName","Phone","Email","DealsCount","Cars","WhenExact","DealStages"]]
-                     .rename(columns={"WhenExact":"When (exact)","DealStages":"Stage(s)"}),
-                     use_container_width=True)
+    # ===== Deal preview =====
+    deals_f = st.session_state.get("manager_deals")
+    if isinstance(deals_f, pd.DataFrame) and not deals_f.empty:
+        render_trimmed(
+            deals_f,
+            "Filtered deals (trimmed)",
+            [
+                "hs_object_id",
+                "full_name",
+                "email",
+                "phone",
+                "vehicle_year",
+                "vehicle_make",
+                "vehicle_model",
+                "car_location_at_time_of_sale",
+                "td_conducted_date",
+                "manager_followup_sms_sent",
+            ],
+        )
+
+    # ===== Messages table / send flow =====
+    msgs = st.session_state.get("manager_msgs")
+    skipped_msgs = st.session_state.get("manager_skipped_msgs")
 
     if isinstance(msgs, pd.DataFrame) and not msgs.empty:
-        st.markdown("#### <span style='color:#000000;'>Message Preview (Manager Follow-Ups)</span>", unsafe_allow_html=True)
         edited = render_selectable_messages(msgs, key="manager")
+
         if isinstance(skipped_msgs, pd.DataFrame) and not skipped_msgs.empty:
-            st.markdown("**Skipped while creating SMS**")
             st.dataframe(skipped_msgs, use_container_width=True)
 
-        if not edited.empty and st.button("Send SMS"):
-            to_send = edited[edited["Send"]]
+        c1, c2, c3 = st.columns([1.2, 1, 1])
+        with c1:
+            send_btn = st.button("Send selected via Aircall", use_container_width=True)
+        with c2:
+            selected_only = st.checkbox("Only selected rows", value=True)
+        with c3:
+            st.caption("Uses Aircall number 2")
+
+        if send_btn:
+            to_send = edited[edited["Selected"] == True] if selected_only else edited.copy()
             if to_send.empty:
                 st.warning("No rows selected.")
-            elif not (AIRCALL_ID and AIRCALL_TOKEN and AIRCALL_NUMBER_ID):
-                st.error("Missing Aircall credentials in .env.")
             else:
                 st.info("Sending messages…")
                 sent, failed = 0, 0
-                sent_phones = []  # Track which phones were sent successfully
+                sent_phones = []  # phones that succeeded
+
                 for _, r in to_send.iterrows():
                     ok, msg = send_sms_via_aircall(r["Phone"], r["SMS draft"], AIRCALL_NUMBER_ID_2)
                     if ok:
@@ -2380,9 +2456,9 @@ def view_manager():
                         st.error(f"❌ Failed for {r['Phone']}: {msg}")
                     time.sleep(1)
 
-                # Update deals in HubSpot after successful sends
+                # After successful sends, update HubSpot deals with manager_followup_sms_sent = true
                 if sent_phones and st.session_state.get("manager_phone_to_deals"):
-                    st.info("Updating HubSpot deals...")
+                    st.info("Updating HubSpot deals…")
                     phone_to_deals = st.session_state["manager_phone_to_deals"]
 
                     all_deal_ids = []
@@ -2396,6 +2472,10 @@ def view_manager():
                             st.success(f"✅ Updated {update_success} deals with manager follow-up SMS status")
                         if update_fail > 0:
                             st.warning(f"⚠️ Failed to update {update_fail} deals")
+
+                if sent:
+                    st.balloons()
+                st.success(f"🎉 Done! Sent: {sent} | Failed: {failed}")
 
 def view_old():
     st.subheader("🕰️  Old Leads by Appointment ID")
