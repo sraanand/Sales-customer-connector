@@ -2304,17 +2304,23 @@ def view_manager():
         go = st.form_submit_button("Fetch deals", use_container_width=True)
 
     # ===== Data fetch and preprocessing =====
+    s_ms, _ = mel_day_bounds_to_epoch_ms(d1)
+    _, e_ms = mel_day_bounds_to_epoch_ms(d2)
+    
     if go:
         with st.spinner("Fetching deals from HubSpot…"):
             # Keep your existing search signature; this call mirrors your current usage.
             # If your function signature differs, keep your original argument list here.
             raw = hs_search_deals_by_date_property(
-                date_property="td_conducted_date",
-                date_from=d1,
-                date_to=d2,
-                pipeline_id=PIPELINE_ID,
-                state_value=rem_state_val,
-            )
+                    pipeline_id=PIPELINE_ID,
+                    stage_id=STAGE_CONDUCTED_ID,
+                    state_value=rem_state_val,
+                    date_property="td_conducted_date",
+                    date_eq_ms=None,
+                    date_start_ms=s_ms,
+                    date_end_ms=e_ms,
+                    total_cap=HS_TOTAL_CAP,
+                )
 
         # Ensure expected columns and normalize (your existing helper)
         deals0 = prepare_deals(raw)
