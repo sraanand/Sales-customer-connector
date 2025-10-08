@@ -2547,7 +2547,10 @@ def view_reminders():
             if c not in msgs.columns:
                 msgs[c] = ""   # or np.nan if you prefer
         view_df = msgs[needed].copy()
-
+        view_df.rename(columns={
+            "CustomerName": "Customer",
+            "Message": "SMS draft"
+        }, inplace=True)
 
         if "Send" not in view_df.columns:
             view_df.insert(0, "Send", False)
@@ -2574,7 +2577,7 @@ def view_reminders():
 
 
 # MODIFIED: Send SMS button with deal update functionality
-    if not edited.empty and st.button("Send SMS"):
+    if not edited.empty and st.button("Send SMS and update HS"):
         to_send = edited[edited["Send"]]
         if to_send.empty:
             st.warning("No rows selected.")
