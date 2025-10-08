@@ -2391,9 +2391,9 @@ def view_reminders():
         # Associate multi-select: user chooses who’s working today
         with c3:
             all_names = list_associate_names()
-            chosen_names = st.multiselect(
-                "Available associates", all_names, default=all_names
-            )
+            selected_name = st.selectbox("Available associate", all_names, index=0)
+            # keep downstream code the same by wrapping in a list
+            chosen_names = [selected_name]
         st.markdown("</div>", unsafe_allow_html=True)
 
         go = st.form_submit_button("Fetch deals", use_container_width=True)
