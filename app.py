@@ -638,6 +638,9 @@ def update_deals_sms_sent(deal_to_email: dict[str, str]) -> tuple[int, int]:
         inputs = []
         for deal_id in batch:
             uid = deal_to_email.get(deal_id)
+            props = {"td_reminder_sms_sent": "true"}
+            if uid:
+                props["ticket_owner"] = uid  # send the HubSpot user id as string
             inputs.append({
                 "id": str(deal_id),
                 "properties": {
@@ -876,6 +879,14 @@ def create_fallback_analysis(raw_response, customer_name):
     }
 
 # core/roster.py
+"""
+Simple, sheet-free roster utilities.
+
+We deliberately DROP Google Sheets and keep a fixed list of associates here.
+Reminders workflow will let the user pick from this list via a multi-select.
+Those selected will be assigned to the deduped customer list round-robin.
+"""
+
 
 # -----------------------------
 # 1) Static associate directory
@@ -2323,6 +2334,7 @@ def _build_messages_for_reminders_with_associates(dedup_df: pd.DataFrame) -> pd.
         video_urls   = str(row.get("VideoURLs") or "").strip()
         associate    = str(row.get("SalesAssociate") or "").strip()
         associate_em = str(row.get("SalesEmail") or "").strip()
+        user_id = row.get("SalesUserIds")
 
         # Build “car + relative time” pairs for the prompt, e.g. “Mazda 3 tomorrow; Kia Cerato today at 13:00”
         pairs_text = build_pairs_text(cars, when_rel)
@@ -2341,6 +2353,7 @@ def _build_messages_for_reminders_with_associates(dedup_df: pd.DataFrame) -> pd.
             "Email": str(row.get("Email") or "").strip(),
             "SalesAssociate": associate,
             "SalesEmail": associate_em,
+            "SalesUserId": user_id,
             "Cars": cars,
             "WhenExact": str(row.get("WhenExact") or ""),
             "WhenRel": when_rel,
@@ -2526,11 +2539,8 @@ def view_reminders():
         st.markdown("#### Message Preview (Reminders)")
         # We render the preview inline to ensure SalesAssociate is shown between Phone and SMS
         view_df = msgs[[
-            "CustomerName","Phone","SalesAssociate","Message"
-        ]].rename(columns={
-            "CustomerName":"Customer",
-            "Message":"SMS draft"
-        }).copy()
+            "CustomerName","Phone","SalesAssociate","SalesUserId","Message"
+        ]].copy()
 
         if "Send" not in view_df.columns:
             view_df.insert(0, "Send", False)
@@ -2545,6 +2555,8 @@ def view_reminders():
                 "Customer": st.column_config.TextColumn("Customer", width=160),
                 "Phone": st.column_config.TextColumn("Phone", width=140),
                 "SalesAssociate": st.column_config.TextColumn("Sales Associate", width=140),
+                "SalesEmail": st.column_config.TextColumn("Sales Email", width=1, disabled=True),   # keep but unobtrusive
+                "SalesUserId": st.column_config.TextColumn("Sales User ID", width=140, disabled=True),
                 "SMS draft": st.column_config.TextColumn("SMS draft", width=520,
                     help="You can edit the text before sending")
             },
@@ -2555,7 +2567,7 @@ def view_reminders():
 
 
 # MODIFIED: Send SMS button with deal update functionality
-    if not edited.empty and st.button("Send SMS and update HS"):
+    if not edited.empty and st.button("Send SMS"):
         to_send = edited[edited["Send"]]
         if to_send.empty:
             st.warning("No rows selected.")
@@ -2589,15 +2601,17 @@ def view_reminders():
                 
                 if all_deal_ids:
                     # Build mapping deal_id -> associate_email
-                    deal_to_email = {}
+                    deal_to_uid = {}
                     for _, r in to_send.iterrows():
                         phone = r["Phone"]
-                        associate_email = r.get("SalesEmail", "")
+                        uid = str(r.get("SalesUserId") or "").strip()
                         user_id = r.get("SalesUserId")
+                        if not uid:
+                            continue
                         if phone in phone_to_deals:
                             for deal_id in phone_to_deals[phone]:
-                                deal_to_email[deal_id] = user_id
-                    update_success, update_fail = update_deals_sms_sent(deal_to_email)
+                                deal_to_uid[deal_id] = uid
+                    update_success, update_fail = update_deals_sms_sent(deal_to_uid)
                     if update_success > 0:
                         st.success(f"✅ Updated {update_success} deals with SMS sent status")
                     if update_fail > 0:
