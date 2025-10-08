@@ -7,6 +7,8 @@ import os
 import time
 import json
 from datetime import datetime, date, timezone, timedelta
+from itertools import cycle
+from typing import List, Dict
 from zoneinfo import ZoneInfo
 
 import numpy as np
