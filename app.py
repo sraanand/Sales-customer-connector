@@ -13,6 +13,7 @@ import pandas as pd
 import requests
 import streamlit as st
 from dotenv import load_dotenv
+from __future__ import annotations
 
 # ============ Keys / Setup ============
 load_dotenv()
