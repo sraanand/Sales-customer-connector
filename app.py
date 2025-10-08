@@ -881,6 +881,7 @@ def create_fallback_analysis(raw_response, customer_name):
 # core/roster.py
 
 
+
 # -----------------------------
 # 1) Static associate directory
 # -----------------------------
@@ -2670,26 +2671,23 @@ def view_manager():
     # ===== Data fetch and preprocessing =====
     s_ms, _ = mel_day_bounds_to_epoch_ms(d1)
     _, e_ms = mel_day_bounds_to_epoch_ms(d2)
-    
+
     if go:
         with st.spinner("Fetching deals from HubSpot…"):
-            # Keep your existing search signature; this call mirrors your current usage.
-            # If your function signature differs, keep your original argument list here.
             raw = hs_search_deals_by_date_property(
-                    pipeline_id=PIPELINE_ID,
-                    stage_id=STAGE_CONDUCTED_ID,
-                    state_value=rem_state_val,
-                    date_property="td_conducted_date",
-                    date_eq_ms=None,
-                    date_start_ms=s_ms,
-                    date_end_ms=e_ms,
-                    total_cap=HS_TOTAL_CAP,
-                )
+                pipeline_id=PIPELINE_ID,
+                stage_id=STAGE_CONDUCTED_ID,
+                state_value=rem_state_val,
+                date_property="td_conducted_date",
+                date_eq_ms=None,
+                date_start_ms=s_ms,
+                date_end_ms=e_ms,
+                total_cap=HS_TOTAL_CAP,
+            )
 
-        # Ensure expected columns and normalize (your existing helper)
         deals0 = prepare_deals(raw)
 
-        # 1) Exclude contacts that have other ACTIVE purchase deals (kept from your existing logic)
+        # 1) Exclude contacts that have other ACTIVE purchase deals
         kept = deals0.copy()
         dropped_active = pd.DataFrame()
         try:
@@ -2705,10 +2703,8 @@ def view_manager():
                         did for did, props in stage_map.items()
                         if (props or {}).get("dealstage") in ACTIVE_PURCHASE_STAGES
                     )
-                    # mark any rows whose contact has an active purchase deal elsewhere
-                    mask_drop = pd.Series(False, index=kept.index)  # start as all False
+                    mask_drop = pd.Series(False, index=kept.index)
                     if d2c:
-                        # any contact whose any other deal is active
                         contact_has_active = {
                             cid: any(d in active_ids for d in c2d.get(cid, []))
                             for cid in contact_ids
@@ -2725,13 +2721,13 @@ def view_manager():
         except Exception as e:
             st.warning(f"Active purchase filter skipped due to: {e}")
 
-        # ======== NEW: exclude deals where manager follow-up SMS already sent ========
+        # 2) Exclude where manager follow-up already sent
         deals_not_sent, removed_sms_sent = filter_manager_sms_already_sent(kept)
 
-        # 2) Internal/test email filter (your existing helper)
+        # 3) Internal/test email filter
         deals_f, removed_internal = filter_internal_test_emails(deals_not_sent)
 
-        # 3) Dedupe + message building (manager mode)
+        # 4) Dedupe + message building (manager mode)
         dedup, dedupe_drop = dedupe_users_with_audit(deals_f, use_conducted=True)
         msgs, skipped_msgs = build_messages_with_audit(dedup, mode="manager")
 
@@ -2739,8 +2735,6 @@ def view_manager():
         st.session_state["manager_deals"] = deals_f
         st.session_state["manager_msgs"] = msgs
         st.session_state["manager_skipped_msgs"] = skipped_msgs
-
-        # Store phone→deal mapping for post-send HubSpot updates
         st.session_state["manager_phone_to_deals"] = get_all_deal_ids_for_contacts(msgs, deals_f)
 
         # Persist removed buckets for “Reasons” UI
@@ -2793,11 +2787,60 @@ def view_manager():
     skipped_msgs = st.session_state.get("manager_skipped_msgs")
 
     if isinstance(msgs, pd.DataFrame) and not msgs.empty:
-        edited = render_selectable_messages(msgs, key="manager")
+        # Build a stable schema for the editor (avoid KeyErrors later)
+        src = msgs.copy()
 
+        # Decide which message column the source has; normalise to "SMS draft" for UI
+        msg_col = "SMS draft" if "SMS draft" in src.columns else ("Message" if "Message" in src.columns else None)
+        if msg_col is None:
+            src["Message"] = ""
+            msg_col = "Message"
+
+        # Make sure a Phone column exists (rename common variants)
+        if "Phone" not in src.columns:
+            for alt in ["phone", "phone_norm", "Mobile", "mobile"]:
+                if alt in src.columns:
+                    src.rename(columns={alt: "Phone"}, inplace=True)
+                    break
+        if "Phone" not in src.columns:
+            src["Phone"] = ""
+
+        # Ensure these columns exist (fill if missing)
+        for c in ["CustomerName", "SalesAssociate", "SalesEmail", "SalesUserId", msg_col]:
+            if c not in src.columns:
+                src[c] = ""
+
+        view_df = src[["CustomerName", "Phone", "SalesAssociate", "SalesEmail", "SalesUserId", msg_col]].copy()
+        view_df.rename(columns={"CustomerName": "Customer"}, inplace=True)
+        if msg_col != "SMS draft":
+            view_df.rename(columns={msg_col: "SMS draft"}, inplace=True)
+
+        # Guarantee the selection checkbox BEFORE editor
+        if "Selected" not in view_df.columns:
+            view_df.insert(0, "Selected", False)
+
+        edited = st.data_editor(
+            view_df,
+            key="editor_manager",
+            use_container_width=True,
+            height=480,
+            column_config={
+                "Selected": st.column_config.CheckboxColumn("Selected", help="Tick to send", default=False, width="small"),
+                "Customer": st.column_config.TextColumn("Customer", width=160),
+                "Phone": st.column_config.TextColumn("Phone", width=140),
+                "SalesAssociate": st.column_config.TextColumn("Sales Associate", width=160, disabled=True),
+                "SalesEmail": st.column_config.TextColumn("Sales Email", width=1, disabled=True),
+                "SalesUserId": st.column_config.TextColumn("Sales User ID", width=1, disabled=True),
+                "SMS draft": st.column_config.TextColumn("SMS draft", width=520, help="You can edit the text before sending"),
+            },
+            hide_index=True,
+        )
+
+        # Also show any skipped messages
         if isinstance(skipped_msgs, pd.DataFrame) and not skipped_msgs.empty:
             st.dataframe(skipped_msgs, use_container_width=True)
 
+        # Controls for sending
         c1, c2, c3 = st.columns([1.2, 1, 1])
         with c1:
             send_btn = st.button("Send selected via Aircall", use_container_width=True)
@@ -2807,34 +2850,49 @@ def view_manager():
             st.caption("Uses Aircall number 2")
 
         if send_btn:
-            to_send = edited[edited["Selected"] == True] if selected_only else edited.copy()
+            # Normalise dtype for the selector and filter
+            if "Selected" in edited.columns:
+                edited["Selected"] = edited["Selected"].fillna(False).astype(bool)
+                to_send = edited[edited["Selected"]] if selected_only else edited.copy()
+            else:
+                # Should not happen, but be safe
+                st.warning("'Selected' column missing; sending all rows.")
+                to_send = edited.copy()
+
             if to_send.empty:
                 st.warning("No rows selected.")
             else:
                 st.info("Sending messages…")
                 sent, failed = 0, 0
-                sent_phones = []  # phones that succeeded
+                sent_phones = []
 
                 for _, r in to_send.iterrows():
-                    ok, msg = send_sms_via_aircall(r["Phone"], r["SMS draft"], AIRCALL_NUMBER_ID_2)
+                    phone = str(r.get("Phone", "")).strip()
+                    body  = str(r.get("SMS draft", "")).strip()
+                    if not phone or not body:
+                        failed += 1
+                        st.error("❌ Skipped row (missing phone or message).")
+                        continue
+
+                    ok, msg = send_sms_via_aircall(phone, body, AIRCALL_NUMBER_ID_2)
                     if ok:
                         sent += 1
-                        sent_phones.append(r["Phone"])
-                        st.success(f"✅ Sent to {r['Phone']}")
+                        sent_phones.append(phone)
+                        st.success(f"✅ Sent to {phone}")
                     else:
                         failed += 1
-                        st.error(f"❌ Failed for {r['Phone']}: {msg}")
+                        st.error(f"❌ Failed for {phone}: {msg}")
                     time.sleep(1)
 
-                # After successful sends, update HubSpot deals with manager_followup_sms_sent = true
-                if sent_phones and st.session_state.get("manager_phone_to_deals"):
+                # Update HubSpot deals with manager_followup_sms_sent = true
+                phone_to_deals = st.session_state.get("manager_phone_to_deals")
+                if sent_phones and phone_to_deals:
                     st.info("Updating HubSpot deals…")
-                    phone_to_deals = st.session_state["manager_phone_to_deals"]
-
                     all_deal_ids = []
-                    for phone in sent_phones:
-                        if phone in phone_to_deals:
-                            all_deal_ids.extend(phone_to_deals[phone])
+                    for ph in sent_phones:
+                        ids = phone_to_deals.get(ph)
+                        if ids:
+                            all_deal_ids.extend(ids)
 
                     if all_deal_ids:
                         update_success, update_fail = update_deals_manager_followup_sms_sent(all_deal_ids)
@@ -2846,6 +2904,10 @@ def view_manager():
                 if sent:
                     st.balloons()
                 st.success(f"🎉 Done! Sent: {sent} | Failed: {failed}")
+
+    else:
+        st.info("No messages to manage yet.")
+
 
 def view_old():
     st.subheader("🕰️  Old Leads by Appointment ID")
