@@ -879,13 +879,6 @@ def create_fallback_analysis(raw_response, customer_name):
     }
 
 # core/roster.py
-"""
-Simple, sheet-free roster utilities.
-
-We deliberately DROP Google Sheets and keep a fixed list of associates here.
-Reminders workflow will let the user pick from this list via a multi-select.
-Those selected will be assigned to the deduped customer list round-robin.
-"""
 
 
 # -----------------------------
