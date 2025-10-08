@@ -2555,7 +2555,7 @@ def view_reminders():
 
 
 # MODIFIED: Send SMS button with deal update functionality
-    if not edited.empty and st.button("Send SMS"):
+    if not edited.empty and st.button("Send SMS and update HS"):
         to_send = edited[edited["Send"]]
         if to_send.empty:
             st.warning("No rows selected.")
