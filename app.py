@@ -2688,38 +2688,92 @@ def view_manager():
         deals0 = prepare_deals(raw)
 
         # 1) Exclude contacts that have other ACTIVE purchase deals
+        # ===== 1) CONTACT-LEVEL active purchase filter =====
         kept = deals0.copy()
-        dropped_active = pd.DataFrame()
+        dropped_contact_active = pd.DataFrame()
+
         try:
-            deal_ids = [str(x) for x in kept["hs_object_id"].dropna().astype(str).tolist()]
+            deal_ids = [str(x) for x in kept.get("hs_object_id", pd.Series([])).dropna().astype(str).tolist()]
             if deal_ids:
+                # Deal -> [contact ids]
                 d2c = hs_deals_to_contacts_map(deal_ids)
-                contact_ids = sorted(set([c for v in d2c.values() for c in v]))
-                c2d = hs_contacts_to_deals_map(contact_ids)
-                other_deal_ids = sorted(set([did for v in c2d.values() for did in v if did not in deal_ids]))
+
+                # Collect unique contacts
+                contact_ids = sorted({c for v in (d2c or {}).values() for c in v})
+
+                # Contact -> [deal ids]
+                c2d = hs_contacts_to_deals_map(contact_ids) if contact_ids else {}
+
+                # All "other" deals linked to those contacts (excluding the ones in 'kept')
+                other_deal_ids = sorted({
+                    did for deals in (c2d or {}).values() for did in deals
+                    if str(did) not in set(deal_ids)
+                })
+
                 if other_deal_ids:
-                    stage_map = hs_batch_read_deals(other_deal_ids, props=["dealstage"])
-                    active_ids = set(
-                        did for did, props in stage_map.items()
+                    # Read stages for those other deals
+                    stage_map = hs_batch_read_deals(other_deal_ids, props=["dealstage"]) or {}
+                    active_ids = {
+                        str(did) for did, props in stage_map.items()
                         if (props or {}).get("dealstage") in ACTIVE_PURCHASE_STAGES
-                    )
-                    mask_drop = pd.Series(False, index=kept.index)
-                    if d2c:
-                        contact_has_active = {
-                            cid: any(d in active_ids for d in c2d.get(cid, []))
-                            for cid in contact_ids
-                        }
-                        kept["__contact_has_active__"] = kept["hs_object_id"].map(
-                            lambda did: any(contact_has_active.get(cid, False) for cid in d2c.get(str(did), []))
+                    }
+
+                    # Mark a kept row for drop if ANY of its contacts has ANY active deal
+                    def contact_has_active_for_deal(did: str) -> bool:
+                        contacts = (d2c or {}).get(str(did), [])
+                        return any(
+                            any(str(d) in active_ids for d in (c2d or {}).get(cid, []))
+                            for cid in contacts
                         )
-                        mask_drop = kept["__contact_has_active__"] == True
-                    dropped_active = kept[mask_drop].copy()
-                    if not dropped_active.empty:
-                        dropped_active["Reason"] = "Active purchase on another deal"
-                        kept = kept[~mask_drop].copy()
-                        kept.drop(columns=["__contact_has_active__"], errors="ignore", inplace=True)
+
+                    kept["__contact_has_active__"] = kept["hs_object_id"].astype(str).map(contact_has_active_for_deal)
+                    mask_drop_contact = kept["__contact_has_active__"] == True
+
+                    dropped_contact_active = kept[mask_drop_contact].copy()
+                    if not dropped_contact_active.empty:
+                        dropped_contact_active["Reason"] = "Contact has another active purchase deal"
+
+                    kept = kept[~mask_drop_contact].copy()
+                    kept.drop(columns=["__contact_has_active__"], errors="ignore", inplace=True)
+
+            # Persist removed bucket for UI
+            st.session_state["manager_dropped_contact_active"] = dropped_contact_active
+
         except Exception as e:
-            st.warning(f"Active purchase filter skipped due to: {e}")
+            st.warning(f"Contact-level active purchase filter skipped due to: {e}")
+            st.session_state["manager_dropped_contact_active"] = pd.DataFrame()
+
+
+        # ===== 2) CAR-LEVEL active purchase filter (by appointment_id) =====
+        # Reuse the same helper you already use in view_reminders()
+        dropped_car_purchases = pd.DataFrame()
+        try:
+            kept, dropped_car_purchases = filter_deals_by_appointment_id_car_active_purchases(kept)
+            if isinstance(dropped_car_purchases, pd.DataFrame) and not dropped_car_purchases.empty:
+                dropped_car_purchases["Reason"] = "Car has another active purchase deal (via appointment_id)"
+            st.session_state["manager_dropped_car_purchases"] = dropped_car_purchases
+        except Exception as e:
+            st.warning(f"Car-level active purchase filter skipped due to: {e}")
+            st.session_state["manager_dropped_car_purchases"] = pd.DataFrame()
+
+
+        # ===== Continue the pipeline from what remains =====
+        deals_not_sent, removed_sms_sent = filter_manager_sms_already_sent(kept)
+        deals_f, removed_internal = filter_internal_test_emails(deals_not_sent)
+        dedup, dedupe_drop = dedupe_users_with_audit(deals_f, use_conducted=True)
+        msgs, skipped_msgs = build_messages_with_audit(dedup, mode="manager")
+
+        # Persist for downstream UI/actions (unchanged)
+        st.session_state["manager_deals"] = deals_f
+        st.session_state["manager_msgs"] = msgs
+        st.session_state["manager_skipped_msgs"] = skipped_msgs
+        st.session_state["manager_phone_to_deals"] = get_all_deal_ids_for_contacts(msgs, deals_f)
+
+        # Persist other removed buckets (unchanged)
+        st.session_state["manager_removed_sms_sent"] = removed_sms_sent
+        st.session_state["manager_removed_internal"] = removed_internal
+        st.session_state["manager_dedupe_drop"] = dedupe_drop
+
 
         # 2) Exclude where manager follow-up already sent
         deals_not_sent, removed_sms_sent = filter_manager_sms_already_sent(kept)
@@ -2740,27 +2794,33 @@ def view_manager():
         # Persist removed buckets for “Reasons” UI
         st.session_state["manager_removed_sms_sent"] = removed_sms_sent
         st.session_state["manager_removed_internal"] = removed_internal
-        st.session_state["manager_dropped_active"] = dropped_active
         st.session_state["manager_dedupe_drop"] = dedupe_drop
 
     # ===== Show removed buckets (Reasons) =====
-    removed_sms = st.session_state.get("manager_removed_sms_sent")
-    removed_int = st.session_state.get("manager_removed_internal")
-    dropped_active = st.session_state.get("manager_dropped_active")
-    dedupe_drop = st.session_state.get("manager_dedupe_drop")
+    removed_sms   = st.session_state.get("manager_removed_sms_sent")
+    removed_int   = st.session_state.get("manager_removed_internal")
+    dropped_ctc   = st.session_state.get("manager_dropped_contact_active")
+    dropped_car   = st.session_state.get("manager_dropped_car_purchases")
+    dedupe_drop   = st.session_state.get("manager_dedupe_drop")
 
     if isinstance(removed_sms, pd.DataFrame) and not removed_sms.empty:
         st.warning(f"⚠️ {len(removed_sms)} deals excluded - manager follow-up already sent")
         show_removed_table(removed_sms, "Removed (manager follow-up already sent)")
 
-    if isinstance(dropped_active, pd.DataFrame) and not dropped_active.empty:
-        show_removed_table(dropped_active, "Removed (active purchase on another deal)")
+    # 1) Contact-level removals (first)
+    if isinstance(dropped_ctc, pd.DataFrame) and not dropped_ctc.empty:
+        show_removed_table(dropped_ctc, "Removed (contact has another active purchase deal)")
+
+    # 2) Car-level removals (second)
+    if isinstance(dropped_car, pd.DataFrame) and not dropped_car.empty:
+        show_removed_table(dropped_car, "Removed (car has another active purchase deal via appointment_id)")
 
     if isinstance(removed_int, pd.DataFrame) and not removed_int.empty:
         show_removed_table(removed_int, "Removed by domain filter (cars24.com / yopmail.com)")
 
     if isinstance(dedupe_drop, pd.DataFrame) and not dedupe_drop.empty:
         show_removed_table(dedupe_drop, "Collapsed during dedupe (duplicates)")
+
 
     # ===== Deal preview =====
     deals_f = st.session_state.get("manager_deals")
