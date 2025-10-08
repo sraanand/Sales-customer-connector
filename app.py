@@ -2334,7 +2334,7 @@ def _build_messages_for_reminders_with_associates(dedup_df: pd.DataFrame) -> pd.
         video_urls   = str(row.get("VideoURLs") or "").strip()
         associate    = str(row.get("SalesAssociate") or "").strip()
         associate_em = str(row.get("SalesEmail") or "").strip()
-        user_id = row.get("SalesUserIds")
+        user_id = str(row.get("SalesUserId") or row.get("SalesUserIds") or "").strip()
 
         # Build “car + relative time” pairs for the prompt, e.g. “Mazda 3 tomorrow; Kia Cerato today at 13:00”
         pairs_text = build_pairs_text(cars, when_rel)
@@ -2362,7 +2362,7 @@ def _build_messages_for_reminders_with_associates(dedup_df: pd.DataFrame) -> pd.
         })
 
     return pd.DataFrame(out_rows, columns=[
-        "CustomerName","Phone","Email","SalesAssociate","SalesEmail",
+        "CustomerName","Phone","Email","SalesAssociate","SalesEmail","SalesUserId",
         "Cars","WhenExact","WhenRel","DealStages","Message"
     ])
 
@@ -2449,10 +2449,14 @@ def view_reminders():
         selected_associates = get_associates_by_names(chosen_names)
         if selected_associates:
             dedup = round_robin_assign(dedup, selected_associates, seed_date=rem_date)
+            # normalise plural/singular
+            if "SalesUserIds" in dedup.columns and "SalesUserId" not in dedup.columns:
+                dedup["SalesUserId"] = dedup["SalesUserIds"]
         else:
             # If none selected, we still proceed with blank associate columns
             dedup["SalesAssociate"] = ""
             dedup["SalesEmail"] = ""
+            dedup["SalesUserId"] = ""
 
         # F) Build messages using associate-personalised drafts
         msgs = _build_messages_for_reminders_with_associates(dedup)
@@ -2538,9 +2542,12 @@ def view_reminders():
     if isinstance(msgs, pd.DataFrame) and not msgs.empty:
         st.markdown("#### Message Preview (Reminders)")
         # We render the preview inline to ensure SalesAssociate is shown between Phone and SMS
-        view_df = msgs[[
-            "CustomerName","Phone","SalesAssociate","SalesUserId","Message"
-        ]].copy()
+        needed = ["CustomerName","Phone","SalesAssociate","SalesUserId","Message"]
+        for c in needed:
+            if c not in msgs.columns:
+                msgs[c] = ""   # or np.nan if you prefer
+        view_df = msgs[needed].copy()
+
 
         if "Send" not in view_df.columns:
             view_df.insert(0, "Send", False)
