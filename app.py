@@ -2,6 +2,7 @@
 # Pawan Customer Connector — HubSpot + Aircall (Streamlit)
 # Updated with working appointment_id-based car filtering
 
+from __future__ import annotations
 import os
 import time
 import json
@@ -13,7 +14,6 @@ import pandas as pd
 import requests
 import streamlit as st
 from dotenv import load_dotenv
-from __future__ import annotations
 
 # ============ Keys / Setup ============
 load_dotenv()
