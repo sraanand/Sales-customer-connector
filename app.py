@@ -884,7 +884,12 @@ def create_fallback_analysis(raw_response, customer_name):
 ASSOCIATES: List[Dict[str, str]] = [
     {"name": "Thomas", "email": "thomas.trindall@cars24.com", "internal_id":118915857},
     {"name": "Ian",    "email": "zhan.hung@cars24.com", "internal_id":81519037},
-    {"name": "Aanand", "email": "sr.aanand@cars24.com", "internal_id":176927767},
+    {"name": "Akshit", "email": "akshit.sood@cars24.com", "internal_id":79855532},
+    {"name": "Paul", "email": "rashpal.puarr@cars24.com", "internal_id":83137252},
+    {"name": "Amaan", "email": "amaandeep.cheema@cars24.com", "internal_id":82744189},
+    {"name": "Braden", "email": "braden.wakefield@cars24.com", "internal_id":83849460},
+    {"name": "Nihal", "email": "nihalratan.makandar@cars24.com", "internal_id":80551471},
+    {"name": "Steffi", "email": "steffi.sendecki@cars24.com", "internal_id":83741187},
 ]
 
 
