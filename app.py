@@ -884,13 +884,6 @@ Reminders workflow will let the user pick from this list via a multi-select.
 Those selected will be assigned to the deduped customer list round-robin.
 """
 
-from __future__ import annotations
-from datetime import date
-from itertools import cycle
-from typing import List, Dict
-import pandas as pd
-
-
 # -----------------------------
 # 1) Static associate directory
 # -----------------------------
