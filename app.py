@@ -1549,6 +1549,7 @@ def draft_sms_reminder_associate(
         "mention the car is in great condition, named sales associate has seen it and is looking forward to meeting the customer and help him/her buy the car. "
         "Ask customer to confirm his plan to visit"
         "if the date of running this prompt is a weekend, encourage the customer to come a little early since it tends to get very busy."
+        "Clear CTA (Yes/NO) to confirm or reschedule. Ask to confirm so that the associate can try and plan his day better."
         "in a new paragraph after leaving a line in between previous paragraph to improve readability, ask the customer to remember to ask about the fantastic Extended Warranty options that Cars24 is known to offer on their cars"
         + (
             "If a video URL is provided, in a new line invite the customer to view the video using the Video URL link before the appointment. "
@@ -1603,13 +1604,13 @@ def draft_sms_reminder_associate(
 
     # --- Post-process: signature logic & character cap ---
     # Check if message starts with associate name (case-insensitive, possibly after "Hi")
-    start_ok = text.strip().lower().startswith(who.lower())
-    hi_who = f"hi {who.lower()}"
-    if not start_ok and not text.strip().lower().startswith(hi_who):
-        # Add signature if not present and message doesn't start with associate name
-        sig = f" –{who}"
-        if not text.strip().endswith(sig):
-            text = (text.rstrip() + sig).strip()
+    #start_ok = text.strip().lower().startswith(who.lower())
+    #hi_who = f"hi {who.lower()}"
+    #if not start_ok and not text.strip().lower().startswith(hi_who):
+    #    # Add signature if not present and message doesn't start with associate name
+    #    sig = f" –{who}"
+    #    if not text.strip().endswith(sig):
+    #        text = (text.rstrip() + sig).strip()
 
     return text
 
