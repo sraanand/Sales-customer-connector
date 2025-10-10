@@ -1526,7 +1526,7 @@ def draft_sms_reminder_associate(
     Generate a *reminder* SMS written by the assigned sales associate.
     Requirements:
       - Tone: warm, polite, Australian. AU spelling. No emojis/links except provided video URL.
-      - Clear CTA to confirm or reschedule.
+      - Clear CTA (Yes/NO) to confirm or reschedule.
       - If associate name is at start, don't sign; otherwise, sign with associate name (default "Pawan").
       - <= 400 characters.
       - If a video URL is provided, mention it as a sneak peek of the car, not purchase process.
@@ -1547,6 +1547,9 @@ def draft_sms_reminder_associate(
         "Tone: warm, polite, inviting, Australian. AU spelling. Avoid apostrophes. "
         "Purpose: remind about the upcoming test drive, sound excited to show the car, "
         "mention the car is in great condition, named sales associate has seen it and is looking forward to meeting the customer and help him/her buy the car. "
+        "Ask customer to confirm his plan to visit"
+        "if the date of running this prompt is a weekend, encourage the customer to come a little early since it tends to get very busy."
+        "in a new paragraph, ask the customer to remember to ask about the fantastic Extended Warranty options that Cars24 is known to offer on their cars"
         + (
             "If a video URL is provided, in a new line invite the customer to view the video using the Video URL link before the appointment. "
             "Call out that this is a sneak peek of the car, not an explanation of the purchase process. "
