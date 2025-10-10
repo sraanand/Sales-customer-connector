@@ -1549,7 +1549,7 @@ def draft_sms_reminder_associate(
         "mention the car is in great condition, named sales associate has seen it and is looking forward to meeting the customer and help him/her buy the car. "
         "Ask customer to confirm his plan to visit"
         "if the date of running this prompt is a weekend, encourage the customer to come a little early since it tends to get very busy."
-        "in a new paragraph, ask the customer to remember to ask about the fantastic Extended Warranty options that Cars24 is known to offer on their cars"
+        "in a new paragraph after leaving a line in between previous paragraph to improve readability, ask the customer to remember to ask about the fantastic Extended Warranty options that Cars24 is known to offer on their cars"
         + (
             "If a video URL is provided, in a new line invite the customer to view the video using the Video URL link before the appointment. "
             "Call out that this is a sneak peek of the car, not an explanation of the purchase process. "
@@ -1610,9 +1610,6 @@ def draft_sms_reminder_associate(
         sig = f" –{who}"
         if not text.strip().endswith(sig):
             text = (text.rstrip() + sig).strip()
-
-    # Enforce 400 character limit
-    text = text[:400].rstrip()
 
     return text
 
