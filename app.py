@@ -890,11 +890,13 @@ ASSOCIATES: List[Dict[str, str]] = [
     {"name": "Thomas", "email": "thomas.trindall@cars24.com", "internal_id":118915857},
     {"name": "Ian",    "email": "zhan.hung@cars24.com", "internal_id":81519037},
     {"name": "Akshit", "email": "akshit.sood@cars24.com", "internal_id":79855532},
-    {"name": "Paul", "email": "rashpal.puarr@cars24.com", "internal_id":83137252},
     {"name": "Amaan", "email": "amaandeep.cheema@cars24.com", "internal_id":82744189},
     {"name": "Braden", "email": "braden.wakefield@cars24.com", "internal_id":83849460},
     {"name": "Nihal", "email": "nihalratan.makandar@cars24.com", "internal_id":80551471},
-    {"name": "Steffi", "email": "steffi.sendecki@cars24.com", "internal_id":83741187},
+    {"name": "Ziyad", "email": "mohammed1.hussain@cars24.com", "internal_id":85297179},
+    {"name": "Angad", "email": "angad.kharbanda@cars24.com", "internal_id":85341215},
+    {"name": "Normund", "email": "normunds.jerumanis@cars24.com", "internal_id":85556775},
+
 ]
 
 
@@ -1526,7 +1528,7 @@ def draft_sms_reminder_associate(
     Generate a *reminder* SMS written by the assigned sales associate.
     Requirements:
       - Tone: warm, polite, Australian. AU spelling. No emojis/links except provided video URL.
-      - Clear CTA (Yes/NO) to confirm or reschedule.
+      - Clear CTA to confirm or reschedule.
       - If associate name is at start, don't sign; otherwise, sign with associate name (default "Pawan").
       - <= 400 characters.
       - If a video URL is provided, mention it as a sneak peek of the car, not purchase process.
@@ -1547,10 +1549,6 @@ def draft_sms_reminder_associate(
         "Tone: warm, polite, inviting, Australian. AU spelling. Avoid apostrophes. "
         "Purpose: remind about the upcoming test drive, sound excited to show the car, "
         "mention the car is in great condition, named sales associate has seen it and is looking forward to meeting the customer and help him/her buy the car. "
-        "Ask customer to confirm his plan to visit"
-        "if the date of running this prompt is a weekend, encourage the customer to come a little early since it tends to get very busy."
-        "Clear CTA (Yes/NO) to confirm or reschedule. Ask to confirm so that the associate can try and plan his day better."
-        "in a new paragraph after leaving a line in between previous paragraph to improve readability, ask the customer to remember to ask about the fantastic Extended Warranty options that Cars24 is known to offer on their cars"
         + (
             "If a video URL is provided, in a new line invite the customer to view the video using the Video URL link before the appointment. "
             "Call out that this is a sneak peek of the car, not an explanation of the purchase process. "
@@ -1604,13 +1602,16 @@ def draft_sms_reminder_associate(
 
     # --- Post-process: signature logic & character cap ---
     # Check if message starts with associate name (case-insensitive, possibly after "Hi")
-    #start_ok = text.strip().lower().startswith(who.lower())
-    #hi_who = f"hi {who.lower()}"
-    #if not start_ok and not text.strip().lower().startswith(hi_who):
-    #    # Add signature if not present and message doesn't start with associate name
-    #    sig = f" –{who}"
-    #    if not text.strip().endswith(sig):
-    #        text = (text.rstrip() + sig).strip()
+    start_ok = text.strip().lower().startswith(who.lower())
+    hi_who = f"hi {who.lower()}"
+    if not start_ok and not text.strip().lower().startswith(hi_who):
+        # Add signature if not present and message doesn't start with associate name
+        sig = f" –{who}"
+        if not text.strip().endswith(sig):
+            text = (text.rstrip() + sig).strip()
+
+    # Enforce 400 character limit
+    text = text[:400].rstrip()
 
     return text
 
