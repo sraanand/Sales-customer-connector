@@ -1601,19 +1601,14 @@ def draft_sms_reminder_associate(
                 "Reply YES to confirm or let me know if you need to reschedule."
             )
 
-    # --- Post-process: signature logic & character cap ---
-    # Check if message starts with associate name (case-insensitive, possibly after "Hi")
-    start_ok = text.strip().lower().startswith(who.lower())
-    hi_who = f"hi {who.lower()}"
-    if not start_ok and not text.strip().lower().startswith(hi_who):
-        # Add signature if not present and message doesn't start with associate name
-        sig = f" –{who}"
-        if not text.strip().endswith(sig):
-            text = (text.rstrip() + sig).strip()
+    # --- ENFORCE Yes/No CTA (minimal, non-invasive) ---
+        if "yes" not in text.lower() and "no" not in text.lower():
+            text = text.rstrip() + " Please reply Yes or No to confirm."
 
     # Enforce 400 character limit
-    text = text[:400].rstrip()
+    text = text[:500].rstrip()
 
+    
     return text
 
 def draft_sms_manager(name: str, pairs_text: str) -> str:
