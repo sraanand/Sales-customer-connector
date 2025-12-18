@@ -1494,7 +1494,7 @@ def draft_sms_reminder(name: str, pairs_text: str, video_urls: str = "") -> str:
     system = (
         "You write outbound SMS for Cars24 Laverton (Australia). "
         "Tone: warm, polite, inviting, Australian. AU spelling. "
-        "Keep ~280 chars unless you are going to add video URLs too. can add limited emojis. Avoid apostrophes."
+        "Keep ~500 chars unless you are going to add video URLs too. can add limited emojis. Avoid apostrophes in salutations."
         "Write as the business (sender). Include a clear CTA to confirm or reschedule."
     )
     # Check if video URLs are provided
@@ -1504,11 +1504,11 @@ def draft_sms_reminder(name: str, pairs_text: str, video_urls: str = "") -> str:
     if has_video:
         # Use first video URL and allow longer message
         first_video_url = video_url_list[0]
-        system += " If video URL provided, encourage virtual tour before test drive. Keep ~400 chars max. No emojis/links except the provided video URL. Avoid apostrophes."
+        system += " If video URL provided, encourage virtual tour before test drive. Keep ~500 chars max. No emojis/links except the provided video URL. Avoid apostrophes in salutations. Write as the business (sender), Include a clear CTA (Yes / NO) to confirm or reschedule."
         user = f"Recipient name: {name or 'there'}.\nUpcoming test drive(s): {pairs_text}.\nVideo tour URL: {first_video_url}.\nFriendly reminder with video tour suggestion."
     else:
         # Standard message without video
-        system += " Keep ~280 chars. No emojis/links. Avoid apostrophes."
+        system += " Keep ~500 chars. No emojis/links. Avoid apostrophes in salutations. Write as the business (sender), Include a clear CTA (Yes / NO) to confirm or reschedule."
         user = f"Recipient name: {name or 'there'}.\nUpcoming test drive(s): {pairs_text}.\nFriendly reminder."
     
     text = _call_openai([
@@ -1528,9 +1528,9 @@ def draft_sms_reminder_associate(
     Generate a *reminder* SMS written by the assigned sales associate.
     Requirements:
       - Tone: warm, polite, Australian. AU spelling. No emojis/links except provided video URL.
-      - Clear CTA to confirm or reschedule.
+      - Clear CTA to confirm or reschedule. This can something like "Please respond with a Yes/No to confirm"
       - If associate name is at start, don't sign; otherwise, sign with associate name (default "Pawan").
-      - <= 400 characters.
+      - <= 500 characters.
       - If a video URL is provided, mention it as a sneak peek of the car, not purchase process.
       - Don't mention video if not provided.
     """
@@ -1549,6 +1549,7 @@ def draft_sms_reminder_associate(
         "Tone: warm, polite, inviting, Australian. AU spelling. Avoid apostrophes. "
         "Purpose: remind about the upcoming test drive, sound excited to show the car, "
         "mention the car is in great condition, named sales associate has seen it and is looking forward to meeting the customer and help him/her buy the car. "
+        "Clear CTA to confirm or reschedule. This can something like Please respond with a Yes/No to confirm"
         + (
             "If a video URL is provided, in a new line invite the customer to view the video using the Video URL link before the appointment. "
             "Call out that this is a sneak peek of the car, not an explanation of the purchase process. "
